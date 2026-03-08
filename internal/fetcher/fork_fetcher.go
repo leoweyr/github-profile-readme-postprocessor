@@ -75,6 +75,7 @@ func (fetcher *ForkFetcher) FetchForks(context context.Context, username string,
 					FullName:  repositoryFullName,
 					HTMLURL:   repositoryHTMLURL,
 					StarredAt: createdAt, // For forks, CreatedAt is when the fork was made.
+					Topics:    repository.Topics,
 				}
 
 				allForkedRepositories = append(allForkedRepositories, domainRepository)

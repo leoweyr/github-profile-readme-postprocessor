@@ -11,4 +11,5 @@ type Repository struct {
 	HTMLURL     string
 	StarredAt   time.Time
 	CommitCount int
+	Topics      []string
 }

@@ -71,6 +71,7 @@ func (fetcher *RecentWatchFetcher) FetchRecentWatches(context context.Context, u
 					FullName:  repositoryName,
 					HTMLURL:   fmt.Sprintf("https://github.com/%s", repositoryName),
 					StarredAt: watchedAt,
+					Topics:    []string{},
 				}
 
 				allWatchedRepositories = append(allWatchedRepositories, watchedRepository)

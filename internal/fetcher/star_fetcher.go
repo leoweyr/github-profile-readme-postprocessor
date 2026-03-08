@@ -37,9 +37,16 @@ func (fetcher *StarFetcher) FetchStars(context context.Context, startTime, endTi
 				Edges []struct {
 					StarredAt time.Time
 					Node      struct {
-						Name          string
-						NameWithOwner string
-						Url           string
+						Name             string
+						NameWithOwner    string
+						Url              string
+						RepositoryTopics struct {
+							Nodes []struct {
+								Topic struct {
+									Name string
+								}
+							}
+						} `graphql:"repositoryTopics(first: 10)"`
 					}
 				}
 				PageInfo struct {
@@ -75,11 +82,18 @@ func (fetcher *StarFetcher) FetchStars(context context.Context, startTime, endTi
 				return allStarredRepositories, nil
 			}
 
+			var topics []string
+
+			for _, topicNode := range edge.Node.RepositoryTopics.Nodes {
+				topics = append(topics, topicNode.Topic.Name)
+			}
+
 			var starredRepository *domain.Repository = &domain.Repository{
 				Name:      edge.Node.Name,
 				FullName:  edge.Node.NameWithOwner,
 				HTMLURL:   edge.Node.Url,
 				StarredAt: starredAt,
+				Topics:    topics,
 			}
 
 			allStarredRepositories = append(allStarredRepositories, starredRepository)

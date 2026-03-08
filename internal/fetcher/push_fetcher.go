@@ -93,6 +93,7 @@ func (fetcher *PushFetcher) FetchPushes(context context.Context, username string
 				HTMLURL:     repositoryHTMLURL,
 				StarredAt:   pushedAt, // Use the latest push time as the timestamp.
 				CommitCount: commitCount,
+				Topics:      repository.Topics,
 			}
 
 			allPushedRepositories = append(allPushedRepositories, domainRepository)
