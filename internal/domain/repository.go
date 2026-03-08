@@ -6,8 +6,9 @@ import (
 
 // Repository represents a GitHub repository with relevant metadata.
 type Repository struct {
-	Name      string
-	FullName  string
-	HTMLURL   string
-	StarredAt time.Time
+	Name        string
+	FullName    string
+	HTMLURL     string
+	StarredAt   time.Time
+	CommitCount int
 }

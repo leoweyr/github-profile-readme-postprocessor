@@ -65,12 +65,12 @@ func (fetcher *StarFetcher) FetchStars(context context.Context, startTime, endTi
 		for _, edge := range query.Viewer.StarredRepositories.Edges {
 			var starredAt time.Time = edge.StarredAt
 
-			// If the star is newer than endTime, skip it but continue (since we sort desc, newer are first)
+			// Skip the star if it is newer than the end time.
 			if starredAt.After(endTime) {
 				continue
 			}
 
-			// If the star is older than startTime, stop fetching (since we sort desc)
+			// Stop fetching if the star is older than the start time.
 			if starredAt.Before(startTime) {
 				return allStarredRepositories, nil
 			}
