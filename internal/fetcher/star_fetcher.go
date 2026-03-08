@@ -7,15 +7,9 @@ import (
 
 	"github.com/shurcooL/githubv4"
 	"golang.org/x/oauth2"
-)
 
-// StarredRepository represents a repository starred by the user.
-type StarredRepository struct {
-	Name      string
-	FullName  string
-	HTMLURL   string
-	StarredAt time.Time
-}
+	"go.leoweyr.com/github-profile-postprocessor/internal/domain"
+)
 
 // StarFetcher handles the retrieval of starred repositories for a user.
 type StarFetcher struct {
@@ -36,7 +30,7 @@ func NewStarFetcher(token string) *StarFetcher {
 }
 
 // FetchStars retrieves repositories starred by the user within the specified time range.
-func (fetcher *StarFetcher) FetchStars(context context.Context, startTime, endTime time.Time) ([]*StarredRepository, error) {
+func (fetcher *StarFetcher) FetchStars(context context.Context, startTime, endTime time.Time) ([]*domain.Repository, error) {
 	var query struct {
 		Viewer struct {
 			StarredRepositories struct {
@@ -56,7 +50,7 @@ func (fetcher *StarFetcher) FetchStars(context context.Context, startTime, endTi
 		}
 	}
 
-	var allStarredRepositories []*StarredRepository
+	var allStarredRepositories []*domain.Repository
 	var variables map[string]interface{} = map[string]interface{}{
 		"cursor": (*githubv4.String)(nil),
 	}
@@ -81,7 +75,7 @@ func (fetcher *StarFetcher) FetchStars(context context.Context, startTime, endTi
 				return allStarredRepositories, nil
 			}
 
-			var starredRepository *StarredRepository = &StarredRepository{
+			var starredRepository *domain.Repository = &domain.Repository{
 				Name:      edge.Node.Name,
 				FullName:  edge.Node.NameWithOwner,
 				HTMLURL:   edge.Node.Url,
