@@ -5,6 +5,9 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
+# Switch to Custom Mirror for Alpine (To fix APK connection issues).
+RUN sed -i "s/dl-cdn.alpinelinux.org/${ALPINE_MIRROR}/g" /etc/apk/repositories
+
 # 1. Install necessary system assets: Timezone data and CA certificates.
 RUN apk --no-cache add tzdata ca-certificates
 
@@ -13,6 +16,7 @@ RUN adduser -D -g '' appuser
 
 # 3. Leverage Docker cache for dependencies.
 COPY go.mod go.sum ./
+ENV GOPROXY=${GOPROXY}
 RUN go mod download
 
 # 4. Copy source code and perform static compilation.
