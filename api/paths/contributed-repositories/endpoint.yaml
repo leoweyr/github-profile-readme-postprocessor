@@ -1,0 +1,108 @@
+get:
+  summary: Get Recently Contributed Repositories
+  description: Returns a JSON list of repositories the user recently contributed to, filtered by criteria.
+
+  tags:
+    - Json
+
+  parameters:
+    - in: query
+      name: username
+      schema:
+        type: string
+      required: true
+      description: The GitHub username to fetch activity for.
+
+    # Filtering options.
+
+    - in: query
+      name: limit_count
+      schema:
+        type: integer
+        default: 3
+      description: The maximum number of repositories to return (sorted by latest activity).
+
+    - in: query
+      name: since
+      schema:
+        type: string
+        format: date-time
+      description: The filter for activities occurring after this timestamp (ISO 8601).
+
+    - in: query
+      name: until
+      schema:
+        type: string
+        format: date-time
+      description: The filter for activities occurring before this timestamp (ISO 8601).
+
+    - in: query
+      name: repository_name_contains
+      schema:
+        type: string
+      description: The substring to filter repositories by name (case-insensitive).
+
+    - in: query
+      name: repository_topic_contains
+      schema:
+        type: string
+      description: The substring to filter repositories by topic (case-insensitive).
+
+    # Activity type filters
+
+    - in: query
+      name: include_commits
+      schema:
+        type: boolean
+        default: true
+      description: Indicates whether to include commit activities.
+
+    - in: query
+      name: include_issues
+      schema:
+        type: boolean
+        default: true
+      description: Indicates whether to include issue activities (opened/commented).
+
+    - in: query
+      name: include_pull_requests
+      schema:
+        type: boolean
+        default: true
+      description: Indicates whether to include pull request activities.
+
+  responses:
+    '200':
+      description: Successful response containing a list of contributed repositories.
+
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: The full name of the repository (owner/repo).
+
+                description:
+                  type: string
+                  description: The description of the repository.
+                
+                active_at:
+                  type: string
+                  format: date-time
+                  description: The timestamp of the most recent activity in this repository.
+                
+
+                
+                is_owner:
+                  type: boolean
+                  description: Indicates whether the user is the owner of the repository.
+              
+              required:
+                - name
+                - description
+                - active_at
+                - is_owner
