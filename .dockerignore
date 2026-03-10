@@ -1,0 +1,30 @@
+# Git
+.git
+.gitignore
+.github
+
+# Go
+bin/
+*.exe
+*.test
+vendor/
+go.work
+
+# Environment Variables
+.env
+
+# Docker
+Dockerfile
+.dockerignore
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project
+docs
+api
