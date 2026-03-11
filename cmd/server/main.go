@@ -6,9 +6,8 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
-
-	"go.leoweyr.com/github-profile-postprocessor/internal/handler"
-	internalHttp "go.leoweyr.com/github-profile-postprocessor/internal/http"
+	"go.leoweyr.com/github-profile-postprocessor/internal/delivery/handler"
+	internalHttp "go.leoweyr.com/github-profile-postprocessor/internal/delivery/http"
 )
 
 func main() {

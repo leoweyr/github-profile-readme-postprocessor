@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"go.leoweyr.com/github-profile-postprocessor/internal/model"
+	"go.leoweyr.com/github-profile-postprocessor/internal/delivery/model"
 )
 
 // ContributedRepositoriesController handles HTTP requests related to GitHub repositories.
