@@ -46,7 +46,19 @@ jobs:
           echo "DYNAMIC_FC_DOMAIN=$FC_URL" >> $GITHUB_ENV
 
       - name: Register to APISIX
+        if: ${{ vars.APISIX_ADMIN_URL != '' && secrets.APISIX_ADMIN_KEY != '' }}
         run: |
+          # 1. Check if APISIX Admin API is reachable
+          HTTP_CODE=$(curl -o /dev/null -s -w "%{http_code}\n" --connect-timeout 5 \
+            -H "X-API-KEY: ${{ secrets.APISIX_ADMIN_KEY }}" \
+            "${{ vars.APISIX_ADMIN_URL }}/apisix/admin/routes")
+          
+          if [[ "$HTTP_CODE" -ne 200 ]]; then
+            echo "APISIX Admin API not reachable or authorized (HTTP $HTTP_CODE). Skipping registration."
+            exit 0
+          fi
+
+          # 2. Proceed with registration
           CLEAN_DOMAIN=$(echo $DYNAMIC_FC_DOMAIN | sed -e 's|^[^/]*//||' -e 's|/.*$||')
           
           curl -i -X PUT "${{ vars.APISIX_ADMIN_URL }}/apisix/admin/routes/github-profile-readme-postprocessor" \
