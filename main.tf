@@ -38,19 +38,15 @@ resource "alicloud_fc_function" "default" {
   service     = alicloud_fc_service.default.name
   name        = "restful"
   runtime     = "custom.debian10"
+  handler     = "index.handler"  # Required but ignored by custom runtime.
   memory_size = 128
   timeout     = 15
 
-  filename         = data.archive_file.bootstrap_zip.output_path
-  source_code_hash = data.archive_file.bootstrap_zip.output_base64sha256
-
-  custom_runtime_config {
-    command = ["./bootstrap"]
-  }
+  filename = data.archive_file.bootstrap_zip.output_path
 
   environment_variables = {
-    FC_CUSTOM_LISTEN_PORT = "8080"  # Tell FC runtime to listen on 8080.
-    APP_GITHUB_TOKEN          = var.github_api_token
+    FC_CUSTOM_LISTEN_PORT = "8080"
+    APP_GITHUB_TOKEN      = var.github_api_token
     GIN_MODE              = "release"
   }
 }
