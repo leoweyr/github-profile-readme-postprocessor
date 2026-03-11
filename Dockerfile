@@ -3,6 +3,10 @@
 # ==========================================
 FROM golang:1.25-alpine AS builder
 
+# Arguments for build customization (Default to standard sources if not provided).
+ARG ALPINE_MIRROR=dl-cdn.alpinelinux.org
+ARG GOPROXY=https://proxy.golang.org,direct
+
 WORKDIR /app
 
 # Switch to Custom Mirror for Alpine (To fix APK connection issues).
