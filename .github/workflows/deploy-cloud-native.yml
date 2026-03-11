@@ -46,7 +46,7 @@ jobs:
           echo "DYNAMIC_FC_DOMAIN=$FC_URL" >> $GITHUB_ENV
 
       - name: Register to APISIX
-        if: ${{ vars.APISIX_ADMIN_URL != '' && secrets.APISIX_ADMIN_KEY != '' }}
+        if: vars.APISIX_ADMIN_URL != '' && secrets.APISIX_ADMIN_KEY != ''
         run: |
           # 1. Check if APISIX Admin API is reachable
           HTTP_CODE=$(curl -o /dev/null -s -w "%{http_code}\n" --connect-timeout 5 \
