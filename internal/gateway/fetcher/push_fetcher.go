@@ -3,6 +3,7 @@ package fetcher
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/go-github/v69/github"
@@ -22,7 +23,7 @@ func NewPushFetcher(token string) *PushFetcher {
 		&oauth2.Token{AccessToken: token},
 	)
 
-	var httpClient = oauth2.NewClient(context.Background(), tokenSource)
+	var httpClient *http.Client = oauth2.NewClient(context.Background(), tokenSource)
 	var client *github.Client = github.NewClient(httpClient)
 
 	return &PushFetcher{
@@ -42,16 +43,18 @@ func (fetcher *PushFetcher) FetchPushes(context context.Context, username string
 	for {
 		var repositories []*github.Repository
 		var response *github.Response
-		var err error
+		var listError error
 
 		// List repositories for the specified user.
-		repositories, response, err = fetcher.client.Repositories.List(context, username, listOptions)
+		repositories, response, listError = fetcher.client.Repositories.List(context, username, listOptions)
 
-		if err != nil {
-			return nil, fmt.Errorf("failed to list user repositories: %w", err)
+		if listError != nil {
+			return nil, fmt.Errorf("failed to list user repositories: %w", listError)
 		}
 
-		for _, repository := range repositories {
+		var repository *github.Repository
+
+		for _, repository = range repositories {
 			if repository.PushedAt == nil {
 				continue
 			}
@@ -70,12 +73,12 @@ func (fetcher *PushFetcher) FetchPushes(context context.Context, username string
 
 			// Get commit count for this repository within the range.
 			var commitCount int
-			var countErr error
-			commitCount, countErr = fetcher.countCommits(context, username, repository.GetName(), startTime, endTime)
+			var countError error
+			commitCount, countError = fetcher.countCommits(context, username, repository.GetName(), startTime, endTime)
 
-			if countErr != nil {
+			if countError != nil {
 				// Log error but continue.
-				fmt.Printf("Error counting commits for %s: %v\n", repository.GetName(), countErr)
+				fmt.Printf("Error counting commits for %s: %v\n", repository.GetName(), countError)
 				continue
 			}
 
@@ -88,12 +91,11 @@ func (fetcher *PushFetcher) FetchPushes(context context.Context, username string
 			var repositoryHTMLURL string = repository.GetHTMLURL()
 
 			var domainRepository *domain.Repository = &domain.Repository{
-				Name:        repositoryName,
-				FullName:    repositoryFullName,
-				HTMLURL:     repositoryHTMLURL,
-				StarredAt:   pushedAt, // Use the latest push time as the timestamp.
-				CommitCount: commitCount,
-				Topics:      repository.Topics,
+				Name:      repositoryName,
+				FullName:  repositoryFullName,
+				HTMLURL:   repositoryHTMLURL,
+				StarredAt: pushedAt, // Use the latest push time as the timestamp.
+				Topics:    repository.Topics,
 			}
 
 			allPushedRepositories = append(allPushedRepositories, domainRepository)
@@ -122,11 +124,12 @@ func (fetcher *PushFetcher) countCommits(context context.Context, username, repo
 
 	var commits []*github.RepositoryCommit
 	var response *github.Response
-	var err error
+	var listError error
 
-	commits, response, err = fetcher.client.Repositories.ListCommits(context, username, repositoryName, commitsListOptions)
-	if err != nil {
-		return 0, err
+	commits, response, listError = fetcher.client.Repositories.ListCommits(context, username, repositoryName, commitsListOptions)
+
+	if listError != nil {
+		return 0, listError
 	}
 
 	// If no commits are found, return 0.

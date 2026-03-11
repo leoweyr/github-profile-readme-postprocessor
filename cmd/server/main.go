@@ -8,25 +8,47 @@ import (
 	"github.com/joho/godotenv"
 	"go.leoweyr.com/github-profile-postprocessor/internal/delivery/handler"
 	internalHttp "go.leoweyr.com/github-profile-postprocessor/internal/delivery/http"
+	"go.leoweyr.com/github-profile-postprocessor/internal/gateway/fetcher"
+	"go.leoweyr.com/github-profile-postprocessor/internal/usecase"
 )
 
 func main() {
 	_ = godotenv.Load()
 
-	// 1. Instantiate Application.
+	// 1. Configuration.
 	var address string = "0.0.0.0:8080"
+	var githubToken string = os.Getenv("GITHUB_TOKEN")
+
+	if githubToken == "" {
+		fmt.Printf("FATAL: GITHUB_TOKEN environment variable is required.\n")
+		os.Exit(1)
+	}
+
+	// 2. Instantiate Dependencies (Gateways).
+	var commitFetcher *fetcher.CommitFetcher = fetcher.NewCommitFetcher(githubToken)
+	var prFetcher *fetcher.PullRequestFetcher = fetcher.NewPullRequestFetcher(githubToken)
+	var repoFetcher *fetcher.RepositoryFetcher = fetcher.NewRepositoryFetcher(githubToken)
+
+	// 3. Instantiate Use Cases.
+	var contributedReposUseCase *usecase.ContributedRepositoriesUseCase = usecase.NewContributedRepositoriesUseCase(
+		commitFetcher,
+		prFetcher,
+		repoFetcher,
+	)
+
+	// 4. Instantiate Application Engine.
 	var applicationEngine *internalHttp.Application = internalHttp.NewApplication(address)
 
-	// 2. Instantiate ContributedRepositoriesController.
-	var repositoryController *handler.ContributedRepositoriesController = handler.NewContributedRepositoriesController()
+	// 5. Instantiate Controllers.
+	var repositoryController *handler.ContributedRepositoriesController = handler.NewContributedRepositoriesController(contributedReposUseCase)
 
-	// 3. Get Router.
+	// 6. Get Router.
 	var router *stdlibHttp.ServeMux = applicationEngine.GetRouter()
 
-	// 4. Register Routes.
+	// 7. Register Routes.
 	repositoryController.RegisterRoutes(router)
 
-	// 5. Run Server.
+	// 8. Run Server.
 	fmt.Printf("Server starting on %s...\n", address)
 	var executionError error = applicationEngine.Run()
 

@@ -3,6 +3,7 @@ package fetcher
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/shurcooL/githubv4"
@@ -21,7 +22,7 @@ func NewStarFetcher(token string) *StarFetcher {
 	var tokenSource oauth2.TokenSource = oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: token},
 	)
-	var httpClient = oauth2.NewClient(context.Background(), tokenSource)
+	var httpClient *http.Client = oauth2.NewClient(context.Background(), tokenSource)
 	var client *githubv4.Client = githubv4.NewClient(httpClient)
 
 	return &StarFetcher{
@@ -63,13 +64,29 @@ func (fetcher *StarFetcher) FetchStars(context context.Context, startTime, endTi
 	}
 
 	for {
-		var err error = fetcher.client.Query(context, &query, variables)
+		var queryError error = fetcher.client.Query(context, &query, variables)
 
-		if err != nil {
-			return nil, fmt.Errorf("failed to query starred repositories: %w", err)
+		if queryError != nil {
+			return nil, fmt.Errorf("failed to query starred repositories: %w", queryError)
 		}
 
-		for _, edge := range query.Viewer.StarredRepositories.Edges {
+		var edge struct {
+			StarredAt time.Time
+			Node      struct {
+				Name             string
+				NameWithOwner    string
+				Url              string
+				RepositoryTopics struct {
+					Nodes []struct {
+						Topic struct {
+							Name string
+						}
+					}
+				} `graphql:"repositoryTopics(first: 10)"`
+			}
+		}
+
+		for _, edge = range query.Viewer.StarredRepositories.Edges {
 			var starredAt time.Time = edge.StarredAt
 
 			// Skip the star if it is newer than the end time.
@@ -84,7 +101,13 @@ func (fetcher *StarFetcher) FetchStars(context context.Context, startTime, endTi
 
 			var topics []string
 
-			for _, topicNode := range edge.Node.RepositoryTopics.Nodes {
+			var topicNode struct {
+				Topic struct {
+					Name string
+				}
+			}
+
+			for _, topicNode = range edge.Node.RepositoryTopics.Nodes {
 				topics = append(topics, topicNode.Topic.Name)
 			}
 

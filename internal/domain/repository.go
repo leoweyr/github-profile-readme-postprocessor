@@ -8,8 +8,9 @@ import (
 type Repository struct {
 	Name        string
 	FullName    string
+	Description string
 	HTMLURL     string
-	StarredAt   time.Time
-	CommitCount int
+	Owner       string
 	Topics      []string
+	StarredAt   time.Time
 }

@@ -23,7 +23,9 @@ func (filter *RepositoryFilter) FilterByName(nameSubstring string) *RepositoryFi
 	var filteredRepositories []*domain.Repository
 	var lowerCaseSubstring string = strings.ToLower(nameSubstring)
 
-	for _, repository := range filter.repositories {
+	var repository *domain.Repository
+
+	for _, repository = range filter.repositories {
 		var lowerCaseName string = strings.ToLower(repository.Name)
 
 		if strings.Contains(lowerCaseName, lowerCaseSubstring) {
@@ -41,10 +43,14 @@ func (filter *RepositoryFilter) FilterByTopic(topicSubstring string) *Repository
 	var filteredRepositories []*domain.Repository
 	var lowerCaseSubstring string = strings.ToLower(topicSubstring)
 
-	for _, repository := range filter.repositories {
+	var repository *domain.Repository
+
+	for _, repository = range filter.repositories {
 		var hasMatchingTopic bool = false
 
-		for _, topic := range repository.Topics {
+		var topic string
+
+		for _, topic = range repository.Topics {
 			var lowerCaseTopic string = strings.ToLower(topic)
 
 			if strings.Contains(lowerCaseTopic, lowerCaseSubstring) {

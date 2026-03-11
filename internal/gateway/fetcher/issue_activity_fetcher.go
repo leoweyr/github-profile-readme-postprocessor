@@ -3,6 +3,7 @@ package fetcher
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -24,7 +25,7 @@ func NewIssueActivityFetcher(token string) *IssueActivityFetcher {
 		&oauth2.Token{AccessToken: token},
 	)
 
-	var httpClient = oauth2.NewClient(context.Background(), tokenSource)
+	var httpClient *http.Client = oauth2.NewClient(context.Background(), tokenSource)
 	var client *github.Client = github.NewClient(httpClient)
 
 	return &IssueActivityFetcher{
@@ -38,21 +39,21 @@ func (fetcher *IssueActivityFetcher) FetchIssueActivities(context context.Contex
 
 	// 1. Fetch created issues (author:username).
 	var createdIssues []*domain.Issue
-	var err error
-	createdIssues, err = fetcher.fetchCreatedIssues(context, username, startTime, endTime)
+	var fetchError error
+	createdIssues, fetchError = fetcher.fetchCreatedIssues(context, username, startTime, endTime)
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch created issues: %w", err)
+	if fetchError != nil {
+		return nil, fmt.Errorf("failed to fetch created issues: %w", fetchError)
 	}
 
 	allActivities = append(allActivities, createdIssues...)
 
 	// 2. Fetch commented issues (commenter:username).
 	var commentedIssues []*domain.Issue
-	commentedIssues, err = fetcher.fetchCommentedIssues(context, username, startTime, endTime)
+	commentedIssues, fetchError = fetcher.fetchCommentedIssues(context, username, startTime, endTime)
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch commented issues: %w", err)
+	if fetchError != nil {
+		return nil, fmt.Errorf("failed to fetch commented issues: %w", fetchError)
 	}
 
 	allActivities = append(allActivities, commentedIssues...)
@@ -74,23 +75,25 @@ func (fetcher *IssueActivityFetcher) fetchCreatedIssues(context context.Context,
 	for {
 		var result *github.IssuesSearchResult
 		var response *github.Response
-		var err error
+		var searchError error
 
-		result, response, err = fetcher.client.Search.Issues(context, query, searchOptions)
+		result, response, searchError = fetcher.client.Search.Issues(context, query, searchOptions)
 
-		if err != nil {
-			return nil, err
+		if searchError != nil {
+			return nil, searchError
 		}
 
-		for _, item := range result.Issues {
-			var repositoryName string = extractRepositoryName(item.GetHTMLURL())
+		var issue *github.Issue
+
+		for _, issue = range result.Issues {
+			var repositoryName string = extractRepositoryName(issue.GetHTMLURL())
 
 			var activity *domain.Issue = &domain.Issue{
-				Title:          item.GetTitle(),
-				HTMLURL:        item.GetHTMLURL(),
+				Title:          issue.GetTitle(),
+				HTMLURL:        issue.GetHTMLURL(),
 				RepositoryName: repositoryName,
-				CreatedAt:      item.GetCreatedAt().Time,
-				Number:         item.GetNumber(),
+				CreatedAt:      issue.GetCreatedAt().Time,
+				Number:         issue.GetNumber(),
 				Action:         enums.IssueActionCreated,
 			}
 
@@ -122,15 +125,17 @@ func (fetcher *IssueActivityFetcher) fetchCommentedIssues(context context.Contex
 	for {
 		var result *github.IssuesSearchResult
 		var response *github.Response
-		var err error
+		var searchError error
 
-		result, response, err = fetcher.client.Search.Issues(context, query, searchOptions)
-		if err != nil {
-			return nil, err
+		result, response, searchError = fetcher.client.Search.Issues(context, query, searchOptions)
+		if searchError != nil {
+			return nil, searchError
 		}
 
-		for _, item := range result.Issues {
-			var repositoryName string = extractRepositoryName(item.GetHTMLURL())
+		var issue *github.Issue
+
+		for _, issue = range result.Issues {
+			var repositoryName string = extractRepositoryName(issue.GetHTMLURL())
 			if repositoryName == "" {
 				continue
 			}
@@ -143,16 +148,17 @@ func (fetcher *IssueActivityFetcher) fetchCommentedIssues(context context.Contex
 			}
 
 			var owner string = parts[0]
-			var repo string = parts[1]
+			var repoName string = parts[1]
 
 			// Fetch comments for this issue to find the ones by the user in the time range.
 			var comments []*domain.Issue
-			comments, err = fetcher.fetchIssueComments(context, owner, repo, item.GetNumber(), username, startTime, endTime, item)
+			var fetchCommentsError error
+			comments, fetchCommentsError = fetcher.fetchIssueComments(context, owner, repoName, issue.GetNumber(), username, startTime, endTime, issue)
 
-			if err != nil {
+			if fetchCommentsError != nil {
 				// Log error but continue with other issues.
 				// Print to stdout for debugging since no logger is available.
-				fmt.Printf("Warning: failed to fetch comments for %s/%s#%d: %v\n", owner, repo, item.GetNumber(), err)
+				fmt.Printf("Warning: failed to fetch comments for %s/%s#%d: %v\n", owner, repoName, issue.GetNumber(), fetchCommentsError)
 				continue
 			}
 
@@ -169,7 +175,7 @@ func (fetcher *IssueActivityFetcher) fetchCommentedIssues(context context.Contex
 	return activities, nil
 }
 
-func (fetcher *IssueActivityFetcher) fetchIssueComments(context context.Context, owner, repo string, issueNumber int, username string, startTime, endTime time.Time, issue *github.Issue) ([]*domain.Issue, error) {
+func (fetcher *IssueActivityFetcher) fetchIssueComments(context context.Context, owner, repositoryName string, issueNumber int, username string, startTime, endTime time.Time, issue *github.Issue) ([]*domain.Issue, error) {
 	var activities []*domain.Issue
 	var listOptions *github.IssueListCommentsOptions = &github.IssueListCommentsOptions{
 		ListOptions: github.ListOptions{PerPage: 100},
@@ -179,14 +185,16 @@ func (fetcher *IssueActivityFetcher) fetchIssueComments(context context.Context,
 	for {
 		var comments []*github.IssueComment
 		var response *github.Response
-		var err error
+		var listError error
 
-		comments, response, err = fetcher.client.Issues.ListComments(context, owner, repo, issueNumber, listOptions)
-		if err != nil {
-			return nil, err
+		comments, response, listError = fetcher.client.Issues.ListComments(context, owner, repositoryName, issueNumber, listOptions)
+		if listError != nil {
+			return nil, listError
 		}
 
-		for _, comment := range comments {
+		var comment *github.IssueComment
+
+		for _, comment = range comments {
 			// Check if comment is by the user.
 			if comment.GetUser().GetLogin() != username {
 				continue
@@ -202,7 +210,7 @@ func (fetcher *IssueActivityFetcher) fetchIssueComments(context context.Context,
 			var activity *domain.Issue = &domain.Issue{
 				Title:          issue.GetTitle(),
 				HTMLURL:        comment.GetHTMLURL(),
-				RepositoryName: fmt.Sprintf("%s/%s", owner, repo),
+				RepositoryName: fmt.Sprintf("%s/%s", owner, repositoryName),
 				CreatedAt:      createdAt,
 				Number:         issueNumber,
 				Action:         enums.IssueActionCommented,

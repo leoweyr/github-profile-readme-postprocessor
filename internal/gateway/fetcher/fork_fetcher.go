@@ -3,6 +3,7 @@ package fetcher
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/go-github/v69/github"
@@ -22,7 +23,7 @@ func NewForkFetcher(token string) *ForkFetcher {
 		&oauth2.Token{AccessToken: token},
 	)
 
-	var httpClient = oauth2.NewClient(context.Background(), tokenSource)
+	var httpClient *http.Client = oauth2.NewClient(context.Background(), tokenSource)
 	var client *github.Client = github.NewClient(httpClient)
 
 	return &ForkFetcher{
@@ -42,16 +43,18 @@ func (fetcher *ForkFetcher) FetchForks(context context.Context, username string,
 	for {
 		var repositories []*github.Repository
 		var response *github.Response
-		var err error
+		var listError error
 
 		// List repositories for the specified user.
-		repositories, response, err = fetcher.client.Repositories.List(context, username, listOptions)
+		repositories, response, listError = fetcher.client.Repositories.List(context, username, listOptions)
 
-		if err != nil {
-			return nil, fmt.Errorf("failed to list user repositories: %w", err)
+		if listError != nil {
+			return nil, fmt.Errorf("failed to list user repositories: %w", listError)
 		}
 
-		for _, repository := range repositories {
+		var repository *github.Repository
+
+		for _, repository = range repositories {
 			var createdAt time.Time = repository.GetCreatedAt().Time
 
 			// Skip the repository if it is newer than the end time.

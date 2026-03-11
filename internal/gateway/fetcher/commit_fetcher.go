@@ -3,6 +3,7 @@ package fetcher
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/go-github/v69/github"
@@ -22,7 +23,7 @@ func NewCommitFetcher(token string) *CommitFetcher {
 		&oauth2.Token{AccessToken: token},
 	)
 
-	var httpClient = oauth2.NewClient(context.Background(), tokenSource)
+	var httpClient *http.Client = oauth2.NewClient(context.Background(), tokenSource)
 	var client *github.Client = github.NewClient(httpClient)
 
 	return &CommitFetcher{
@@ -46,22 +47,23 @@ func (fetcher *CommitFetcher) FetchCommits(context context.Context, username str
 	for {
 		var result *github.CommitsSearchResult
 		var response *github.Response
-		var err error
+		var searchError error
 
 		// Search for commits matching the query.
 		// Note: The Search API has rate limits (30 requests per minute for authenticated users).
-		result, response, err = fetcher.client.Search.Commits(context, query, searchOptions)
+		result, response, searchError = fetcher.client.Search.Commits(context, query, searchOptions)
 
-		if err != nil {
-			return nil, fmt.Errorf("failed to search commits: %w", err)
+		if searchError != nil {
+			return nil, fmt.Errorf("failed to search commits: %w", searchError)
 		}
 
-		for _, item := range result.Commits {
+		var item *github.CommitResult
+		for _, item = range result.Commits {
 			if item.Commit == nil || item.Commit.Committer == nil {
 				continue
 			}
 
-			var sha string = item.GetSHA()
+			var commitHash string = item.GetSHA()
 			var message string = item.Commit.GetMessage()
 			var htmlURL string = item.GetHTMLURL()
 			var committedAt time.Time
@@ -77,7 +79,7 @@ func (fetcher *CommitFetcher) FetchCommits(context context.Context, username str
 			}
 
 			var commit *domain.Commit = &domain.Commit{
-				SHA:            sha,
+				SHA:            commitHash,
 				Message:        message,
 				RepositoryName: repositoryName,
 				HTMLURL:        htmlURL,
