@@ -17,7 +17,7 @@ func main() {
 
 	// 1. Configuration.
 	var address string = "0.0.0.0:8080"
-	var githubToken string = os.Getenv("GITHUB_TOKEN")
+	var githubToken string = os.Getenv("APP_GITHUB_TOKEN")
 
 	if githubToken == "" {
 		fmt.Printf("FATAL: GITHUB_TOKEN environment variable is required.\n")

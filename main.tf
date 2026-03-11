@@ -50,7 +50,7 @@ resource "alicloud_fc_function" "default" {
 
   environment_variables = {
     FC_CUSTOM_LISTEN_PORT = "8080"  # Tell FC runtime to listen on 8080.
-    GITHUB_TOKEN          = var.github_api_token
+    APP_GITHUB_TOKEN          = var.github_api_token
     GIN_MODE              = "release"
   }
 }
