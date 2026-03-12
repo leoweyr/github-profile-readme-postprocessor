@@ -47,8 +47,8 @@ resource "alicloud_fc_function" "default" {
   name        = "restful"
   runtime     = "custom.debian10"
   handler     = "index.handler"
-  memory_size = 128
-  timeout     = 60
+  memory_size = 512
+  timeout     = 120
 
   filename      = data.archive_file.function_zip.output_path
   code_checksum = data.archive_file.function_zip.output_base64sha256
