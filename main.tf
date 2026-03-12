@@ -56,6 +56,7 @@ resource "alicloud_fc_function" "default" {
   environment_variables = {
     APP_GITHUB_TOKEN      = var.github_api_token
     GIN_MODE              = "release"
+    APP_LISTEN_PORT       = "9000"
   }
 }
 
