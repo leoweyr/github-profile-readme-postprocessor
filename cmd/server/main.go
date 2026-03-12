@@ -17,6 +17,11 @@ func main() {
 
 	// 1. Configuration.
 	var address string = "0.0.0.0:8080"
+
+	if envPort := os.Getenv("APP_LISTEN_PORT"); envPort != "" {
+		address = "0.0.0.0:" + envPort
+	}
+
 	var githubToken string = os.Getenv("APP_GITHUB_TOKEN")
 
 	if githubToken == "" {

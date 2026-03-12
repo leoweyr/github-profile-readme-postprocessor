@@ -17,6 +17,11 @@ terraform {
   }
 }
 
+locals {
+  region = "cn-hangzhou"
+  binary_name = "bootstrap"
+}
+
 provider "alicloud" {
   region = local.region
 }
@@ -24,11 +29,6 @@ provider "alicloud" {
 variable "github_api_token" {
   type = string
   sensitive = true
-}
-
-locals {
-  region = "cn-hangzhou"
-  binary_name = "bootstrap"
 }
 
 data "archive_file" "function_zip" {
@@ -54,7 +54,6 @@ resource "alicloud_fc_function" "default" {
   code_checksum = data.archive_file.function_zip.output_base64sha256
 
   environment_variables = {
-    FC_CUSTOM_LISTEN_PORT = "8080"
     APP_GITHUB_TOKEN      = var.github_api_token
     GIN_MODE              = "release"
   }
