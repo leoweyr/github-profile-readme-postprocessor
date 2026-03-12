@@ -67,6 +67,11 @@ jobs:
             -d '{
               "name": "github-profile-readme-postprocessor",
               "uri": "/api/github-profile-readme-postprocessor/*",
+              "plugins": {
+                "proxy-rewrite": {
+                  "regex_uri": ["^/api/github-profile-readme-postprocessor/(.*)", "/$1"]
+                }
+              }
               "upstream": {
                 "type": "roundrobin",
                 "scheme": "https",
