@@ -48,7 +48,7 @@ resource "alicloud_fc_function" "default" {
   runtime     = "custom.debian10"
   handler     = "index.handler"
   memory_size = 128
-  timeout     = 15
+  timeout     = 60
 
   filename      = data.archive_file.function_zip.output_path
   code_checksum = data.archive_file.function_zip.output_base64sha256
