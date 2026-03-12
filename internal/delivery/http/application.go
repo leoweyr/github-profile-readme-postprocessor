@@ -24,7 +24,7 @@ func NewApplication(address string) *Application {
 	// Default server configuration
 	var server *http.Server = &http.Server{
 		Addr:         address,
-		Handler:      multiplexer,
+		Handler:      recoverPanic(multiplexer),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -34,6 +34,20 @@ func NewApplication(address string) *Application {
 		Server:      server,
 		Multiplexer: multiplexer,
 	}
+}
+
+func recoverPanic(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				// Log the panic details (in production, use structured logging).
+				fmt.Printf("PANIC RECOVERED: %v\n", err)
+				w.Header().Set("Connection", "close")
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
 }
 
 // GetRouter returns the underlying HTTP request multiplexer.
