@@ -267,15 +267,27 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 		return
 	}
 
+	// Calculate latest active time.
+	var latestActiveAt time.Time
+
+	if len(results) > 0 {
+		// Results are already sorted by ActiveAt descending in the UseCase.
+		latestActiveAt = results[0].ActiveAt
+	}
+
 	// 3. Serialize Response as Markdown.
 	responseWriter.Header().Set("Content-Type", "text/markdown; charset=utf-8")
 	responseWriter.WriteHeader(http.StatusOK)
+
+	// Write Start Comment with Timestamp.
+	fmt.Fprintf(responseWriter, "<!-- LATEST_ACTIVITY: %s -->\n", latestActiveAt.Format(time.RFC3339))
 
 	// Write Title.
 	fmt.Fprintf(responseWriter, "%s\n\n", title)
 
 	// Write List.
 	var result *domain.ContributedRepository
+
 	for _, result = range results {
 		var ownedTag string = ""
 		if result.IsOwner {
@@ -283,11 +295,23 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 		}
 
 		// - **[RepoName](RepoURL)** `Owned` — Description.
-		fmt.Fprintf(responseWriter, "- **[%s](%s)**%s — %s\n\n",
-			result.Repository.Name,
-			result.Repository.HTMLURL,
-			ownedTag,
-			result.Repository.Description,
-		)
+		// If description is empty, don't print the dash.
+		if result.Repository.Description != "" {
+			fmt.Fprintf(responseWriter, "- **[%s](%s)**%s — %s\n\n",
+				result.Repository.Name,
+				result.Repository.HTMLURL,
+				ownedTag,
+				result.Repository.Description,
+			)
+		} else {
+			fmt.Fprintf(responseWriter, "- **[%s](%s)**%s\n\n",
+				result.Repository.Name,
+				result.Repository.HTMLURL,
+				ownedTag,
+			)
+		}
 	}
+
+	// Write End Comment.
+	fmt.Fprintf(responseWriter, "<!-- LATEST_ACTIVITY_END -->")
 }
