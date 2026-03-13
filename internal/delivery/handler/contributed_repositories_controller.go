@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -29,21 +30,30 @@ func NewContributedRepositoriesController(useCase *usecase.ContributedRepositori
 func (controller *ContributedRepositoriesController) RegisterRoutes(router *http.ServeMux) {
 	// Explicitly map HTTP verbs and paths.
 	router.HandleFunc("GET /v1/contributed-repositories", controller.HandleGetContributedRepositories)
+	router.HandleFunc("GET /v1/contributed-repositories/markdown", controller.HandleGetContributedRepositoriesMarkdown)
 }
 
-// HandleGetContributedRepositories handles the request to get recently contributed repositories.
-func (controller *ContributedRepositoriesController) HandleGetContributedRepositories(responseWriter http.ResponseWriter, request *http.Request) {
-	// 1. Parse Request Parameters (Query String).
+// parseQueryParameters extracts and validates common query parameters.
+func (controller *ContributedRepositoriesController) parseQueryParameters(request *http.Request) (
+	username string,
+	limitCount int,
+	startTime time.Time,
+	endTime time.Time,
+	repositoryNameFilter string,
+	repositoryTopicFilter string,
+	includeCommits bool,
+	includePullRequests bool,
+	err error,
+) {
 	var queryValues url.Values = request.URL.Query()
 
-	var username string = queryValues.Get("username")
+	username = queryValues.Get("username")
 
 	if username == "" {
-		http.Error(responseWriter, "Missing required parameter: username", http.StatusBadRequest)
-		return
+		return "", 0, time.Time{}, time.Time{}, "", "", false, false, fmt.Errorf("missing required parameter: username")
 	}
 
-	var limitCount int = 3
+	limitCount = 3
 	var value string = queryValues.Get("limit_count")
 
 	if value != "" {
@@ -57,7 +67,7 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	}
 
 	// Default time range: last 30 days if not specified.
-	var endTime time.Time = time.Now()
+	endTime = time.Now()
 	value = queryValues.Get("until")
 
 	if value != "" {
@@ -70,7 +80,7 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 		}
 	}
 
-	var startTime time.Time = endTime.AddDate(0, 0, -30)
+	startTime = endTime.AddDate(0, 0, -30)
 	value = queryValues.Get("since")
 
 	if value != "" {
@@ -83,21 +93,44 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 		}
 	}
 
-	var repositoryNameFilter string = queryValues.Get("repository_name_contains")
-	var repositoryTopicFilter string = queryValues.Get("repository_topic_contains")
+	repositoryNameFilter = queryValues.Get("repository_name_contains")
+	repositoryTopicFilter = queryValues.Get("repository_topic_contains")
 
-	var includeCommits bool = true
+	includeCommits = true
 	value = queryValues.Get("include_commits")
 
 	if value == "false" {
 		includeCommits = false
 	}
 
-	var includePullRequests bool = true
+	includePullRequests = true
 	value = queryValues.Get("include_pull_requests")
 
 	if value == "false" {
 		includePullRequests = false
+	}
+
+	return username, limitCount, startTime, endTime, repositoryNameFilter, repositoryTopicFilter, includeCommits, includePullRequests, nil
+}
+
+// HandleGetContributedRepositories handles the request to get recently contributed repositories.
+func (controller *ContributedRepositoriesController) HandleGetContributedRepositories(responseWriter http.ResponseWriter, request *http.Request) {
+	// 1. Parse Request Parameters (Query String).
+	var username string
+	var limitCount int
+	var startTime time.Time
+	var endTime time.Time
+	var repositoryNameFilter string
+	var repositoryTopicFilter string
+	var includeCommits bool
+	var includePullRequests bool
+	var parseError error
+
+	username, limitCount, startTime, endTime, repositoryNameFilter, repositoryTopicFilter, includeCommits, includePullRequests, parseError = controller.parseQueryParameters(request)
+
+	if parseError != nil {
+		http.Error(responseWriter, parseError.Error(), http.StatusBadRequest)
+		return
 	}
 
 	// 2. Call Core Business Logic (Service Layer).
@@ -146,5 +179,78 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	if encodingError != nil {
 		http.Error(responseWriter, "Failed to encode response", http.StatusInternalServerError)
 		return
+	}
+}
+
+// HandleGetContributedRepositoriesMarkdown handles the request to get recently contributed repositories in Markdown format.
+func (controller *ContributedRepositoriesController) HandleGetContributedRepositoriesMarkdown(responseWriter http.ResponseWriter, request *http.Request) {
+	// 1. Parse Request Parameters (Query String).
+	var username string
+	var limitCount int
+	var startTime time.Time
+	var endTime time.Time
+	var repositoryNameFilter string
+	var repositoryTopicFilter string
+	var includeCommits bool
+	var includePullRequests bool
+	var parseError error
+
+	username, limitCount, startTime, endTime, repositoryNameFilter, repositoryTopicFilter, includeCommits, includePullRequests, parseError = controller.parseQueryParameters(request)
+
+	if parseError != nil {
+		http.Error(responseWriter, parseError.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Parse title for markdown.
+	var title string = request.URL.Query().Get("title")
+	if title == "" {
+		title = "### 📦 Project"
+	}
+
+	// 2. Call Core Business Logic (Service Layer).
+	var context context.Context = request.Context()
+	var results []*domain.ContributedRepository
+	var executeError error
+
+	results, executeError = controller.useCase.Execute(
+		context,
+		username,
+		startTime,
+		endTime,
+		limitCount,
+		repositoryNameFilter,
+		repositoryTopicFilter,
+		includeCommits,
+		includePullRequests,
+	)
+
+	if executeError != nil {
+		http.Error(responseWriter, "Failed to fetch contributed repositories: "+executeError.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 3. Serialize Response as Markdown.
+	responseWriter.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	responseWriter.WriteHeader(http.StatusOK)
+
+	// Write Title.
+	fmt.Fprintf(responseWriter, "%s\n\n", title)
+
+	// Write List.
+	var result *domain.ContributedRepository
+	for _, result = range results {
+		var ownedTag string = ""
+		if result.IsOwner {
+			ownedTag = " `Owned`"
+		}
+
+		// - **[RepoName](RepoURL)** `Owned` — Description.
+		fmt.Fprintf(responseWriter, "- **[%s](%s)**%s — %s\n\n",
+			result.Repository.Name,
+			result.Repository.HTMLURL,
+			ownedTag,
+			result.Repository.Description,
+		)
 	}
 }
