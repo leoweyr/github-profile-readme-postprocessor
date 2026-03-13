@@ -94,24 +94,43 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		}
 	}
 
-	repositoryNameFilters = queryValues["repository_name_contains"]
+	var rawNameFilters []string = queryValues["repository_name_contains"]
+	repositoryNameFilters = make([]string, 0)
 
-	if len(repositoryNameFilters) == 1 && strings.Contains(repositoryNameFilters[0], ",") {
-		repositoryNameFilters = strings.Split(repositoryNameFilters[0], ",")
+	var rawFilter string
+
+	for _, rawFilter = range rawNameFilters {
+		var cleanRaw string = strings.Trim(rawFilter, "\"")
+		var splits []string = strings.Split(cleanRaw, ",")
+
+		var s string
+
+		for _, s = range splits {
+			var trimmed string = strings.Trim(s, "\"")
+			trimmed = strings.TrimSpace(trimmed)
+
+			if trimmed != "" {
+				repositoryNameFilters = append(repositoryNameFilters, trimmed)
+			}
+		}
 	}
 
-	for i, v := range repositoryNameFilters {
-		repositoryNameFilters[i] = strings.Trim(v, "\"")
-	}
+	var rawTopicFilters []string = queryValues["repository_topic_contains"]
+	repositoryTopicFilters = make([]string, 0)
 
-	repositoryTopicFilters = queryValues["repository_topic_contains"]
+	for _, rawFilter = range rawTopicFilters {
+		var cleanRaw string = strings.Trim(rawFilter, "\"")
+		var splits []string = strings.Split(cleanRaw, ",")
 
-	if len(repositoryTopicFilters) == 1 && strings.Contains(repositoryTopicFilters[0], ",") {
-		repositoryTopicFilters = strings.Split(repositoryTopicFilters[0], ",")
-	}
+		var s string
 
-	for i, v := range repositoryTopicFilters {
-		repositoryTopicFilters[i] = strings.Trim(v, "\"")
+		for _, s = range splits {
+			var trimmed string = strings.Trim(s, "\"")
+			trimmed = strings.TrimSpace(trimmed)
+			if trimmed != "" {
+				repositoryTopicFilters = append(repositoryTopicFilters, trimmed)
+			}
+		}
 	}
 
 	includeCommits = true
