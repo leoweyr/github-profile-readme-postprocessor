@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from ..updater import ContentUpdater
+from updater import ContentUpdater
 
 
 class TaskProcessor:

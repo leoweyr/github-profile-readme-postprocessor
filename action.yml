@@ -56,9 +56,9 @@ runs:
     - name: Update README
       shell: bash
       env:
-        PYTHONPATH: ${{ github.action_path }}
+        PYTHONPATH: ${{ github.action_path }}/scripts
       run: |
-        python3 -m scripts.main \
+        python3 -m main \
           --username "${{ github.repository_owner }}" \
           --readme_template_path "${{ inputs.readme_template_path }}" \
           --output "README.md" \
