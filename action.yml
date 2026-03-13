@@ -1,0 +1,72 @@
+name: 'GitHub Profile Readme Postprocessor Action'
+description: 'Automatically update your GitHub profile README with your recent activity and repository insights using a local Go server.'
+author: 'leoweyr'
+
+inputs:
+  readme_template_path:
+    description: 'Path to the README template file.'
+    default: 'template/README.md'
+    required: false
+  github_token:
+    description: 'GitHub Token for API access'
+    required: true
+  tasks:
+    description: 'JSON list of tasks. Each task defines an anchor, endpoint, and specific params. Example: [{"anchor": "<!-- REPOS -->", "endpoint": "/v1/contributed-repositories/markdown", "params": {"limit_count": 5}}]'
+    required: false
+    default: |
+      [
+        {
+          "anchor": "<!-- SUPPORT_INFO -->",
+          "endpoint": "/v1/support/markdown",
+          "params": {}
+        },
+        {
+          "anchor": "<!-- CONTRIBUTED_REPOS -->",
+          "endpoint": "/v1/contributed-repositories/markdown",
+          "params": {}
+        }
+      ]
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25'
+
+    - name: Build and Start Server
+      shell: bash
+      env:
+        APP_GITHUB_TOKEN: ${{ inputs.github_token }}
+        APP_LISTEN_PORT: 8080
+      run: |
+        echo "Starting Go server..."
+        go run cmd/server/main.go &
+        SERVER_PID=$!
+        echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+        # Wait for server to be ready.
+        timeout 30 bash -c 'until curl -s http://localhost:8080/health > /dev/null; do sleep 1; done' || echo "Server failed to start"
+
+    - name: Install Python Dependencies
+      shell: bash
+      run: pip3 install -r ${{ github.action_path }}/scripts/requirements.txt
+
+    - name: Update README
+      shell: bash
+      env:
+        PYTHONPATH: ${{ github.action_path }}
+      run: |
+        python3 -m scripts.main \
+          --username "${{ github.repository_owner }}" \
+          --readme_template_path "${{ inputs.readme_template_path }}" \
+          --output "README.md" \
+          --tasks '${{ inputs.tasks }}'
+
+    - name: Stop Server
+      if: always()
+      shell: bash
+      run: |
+        if [ -n "$SERVER_PID" ]; then
+          kill $SERVER_PID || true
+        fi
