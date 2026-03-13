@@ -1,0 +1,23 @@
+get:
+  summary: Get Project Support Information in Markdown
+  description: Returns markdown content containing generation time and technical support information for github-profile-readme-postprocessor.
+
+  tags:
+    - Markdown
+
+  responses:
+    '200':
+      description: Markdown response with generated content time and support links.
+      content:
+        text/markdown:
+          schema:
+            type: string
+            example: |
+              <div align="left">
+                <sub>
+                  ⚙️ <b>Automatically Updated Content</b> | 
+                  <i>Last synced: 2026-03-13 10:19 UTC</i> | Power by <a href="https://github.com/leoweyr/github-profile-readme-postprocessor">leoweyr/github-profile-readme-postprocessor</a>.
+                </sub>
+              </div>
+
+              ---

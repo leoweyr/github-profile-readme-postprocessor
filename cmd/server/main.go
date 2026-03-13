@@ -45,12 +45,14 @@ func main() {
 	var applicationEngine *internalHttp.Application = internalHttp.NewApplication(address)
 
 	// 5. Instantiate Controllers.
+	var supportController *handler.SupportController = handler.NewSupportController()
 	var repositoryController *handler.ContributedRepositoriesController = handler.NewContributedRepositoriesController(contributedReposUseCase)
 
 	// 6. Get Router.
 	var router *stdlibHttp.ServeMux = applicationEngine.GetRouter()
 
 	// 7. Register Routes.
+	supportController.RegisterRoutes(router)
 	repositoryController.RegisterRoutes(router)
 
 	// 8. Run Server.
