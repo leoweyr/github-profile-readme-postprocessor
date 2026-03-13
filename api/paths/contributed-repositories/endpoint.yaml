@@ -39,14 +39,22 @@ get:
     - in: query
       name: repository_name_contains
       schema:
-        type: string
-      description: The substring to filter repositories by name (case-insensitive).
+        type: array
+        items:
+          type: string
+      style: form
+      explode: true
+      description: The list of substrings to filter repositories by name (case-insensitive, OR logic).
 
     - in: query
       name: repository_topic_contains
       schema:
-        type: string
-      description: The substring to filter repositories by topic (case-insensitive).
+        type: array
+        items:
+          type: string
+      style: form
+      explode: true
+      description: The list of substrings to filter repositories by topic (case-insensitive, OR logic).
 
     # Activity type filters.
 

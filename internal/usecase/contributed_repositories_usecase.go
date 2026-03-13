@@ -35,8 +35,8 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 	username string,
 	startTime, endTime time.Time,
 	limit int,
-	repositoryNameFilter string,
-	repositoryTopicFilter string,
+	repositoryNameFilters []string,
+	repositoryTopicFilters []string,
 	includeCommits bool,
 	includePullRequests bool,
 ) ([]*domain.ContributedRepository, error) {
@@ -121,9 +121,21 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 		var repositoryName string = parts[1]
 
-		// Filter by repository name (substring match).
-		if repositoryNameFilter != "" && !strings.Contains(strings.ToLower(repositoryFullName), strings.ToLower(repositoryNameFilter)) {
-			continue
+		// Filter by repository name (substring match with OR logic).
+		if len(repositoryNameFilters) > 0 {
+			var matchFound bool = false
+			var filter string
+
+			for _, filter = range repositoryNameFilters {
+				if filter != "" && strings.Contains(strings.ToLower(repositoryFullName), strings.ToLower(filter)) {
+					matchFound = true
+					break
+				}
+			}
+
+			if !matchFound {
+				continue
+			}
 		}
 
 		var repositoryDetails *domain.Repository
@@ -136,14 +148,26 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 			continue
 		}
 
-		// Filter by topic.
-		if repositoryTopicFilter != "" {
+		// Filter by topic (OR logic across topics and filters).
+		if len(repositoryTopicFilters) > 0 {
 			var topicMatch bool = false
-			var topic string
+			var filter string
 
-			for _, topic = range repositoryDetails.Topics {
-				if strings.Contains(strings.ToLower(topic), strings.ToLower(repositoryTopicFilter)) {
-					topicMatch = true
+			for _, filter = range repositoryTopicFilters {
+				if filter == "" {
+					continue
+				}
+
+				var topic string
+
+				for _, topic = range repositoryDetails.Topics {
+					if strings.Contains(strings.ToLower(topic), strings.ToLower(filter)) {
+						topicMatch = true
+						break
+					}
+				}
+
+				if topicMatch {
 					break
 				}
 			}

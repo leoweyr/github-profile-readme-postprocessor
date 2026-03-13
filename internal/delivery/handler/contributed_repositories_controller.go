@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"go.leoweyr.com/github-profile-postprocessor/internal/delivery/model"
@@ -39,8 +40,8 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 	limitCount int,
 	startTime time.Time,
 	endTime time.Time,
-	repositoryNameFilter string,
-	repositoryTopicFilter string,
+	repositoryNameFilters []string,
+	repositoryTopicFilters []string,
 	includeCommits bool,
 	includePullRequests bool,
 	err error,
@@ -50,7 +51,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 	username = queryValues.Get("username")
 
 	if username == "" {
-		return "", 0, time.Time{}, time.Time{}, "", "", false, false, fmt.Errorf("missing required parameter: username")
+		return "", 0, time.Time{}, time.Time{}, nil, nil, false, false, fmt.Errorf("missing required parameter: username")
 	}
 
 	limitCount = 3
@@ -93,8 +94,25 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		}
 	}
 
-	repositoryNameFilter = queryValues.Get("repository_name_contains")
-	repositoryTopicFilter = queryValues.Get("repository_topic_contains")
+	repositoryNameFilters = queryValues["repository_name_contains"]
+
+	if len(repositoryNameFilters) == 1 && strings.Contains(repositoryNameFilters[0], ",") {
+		repositoryNameFilters = strings.Split(repositoryNameFilters[0], ",")
+	}
+
+	for i, v := range repositoryNameFilters {
+		repositoryNameFilters[i] = strings.Trim(v, "\"")
+	}
+
+	repositoryTopicFilters = queryValues["repository_topic_contains"]
+
+	if len(repositoryTopicFilters) == 1 && strings.Contains(repositoryTopicFilters[0], ",") {
+		repositoryTopicFilters = strings.Split(repositoryTopicFilters[0], ",")
+	}
+
+	for i, v := range repositoryTopicFilters {
+		repositoryTopicFilters[i] = strings.Trim(v, "\"")
+	}
 
 	includeCommits = true
 	value = queryValues.Get("include_commits")
@@ -110,7 +128,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		includePullRequests = false
 	}
 
-	return username, limitCount, startTime, endTime, repositoryNameFilter, repositoryTopicFilter, includeCommits, includePullRequests, nil
+	return username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, nil
 }
 
 // HandleGetContributedRepositories handles the request to get recently contributed repositories.
@@ -120,13 +138,13 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	var limitCount int
 	var startTime time.Time
 	var endTime time.Time
-	var repositoryNameFilter string
-	var repositoryTopicFilter string
+	var repositoryNameFilters []string
+	var repositoryTopicFilters []string
 	var includeCommits bool
 	var includePullRequests bool
 	var parseError error
 
-	username, limitCount, startTime, endTime, repositoryNameFilter, repositoryTopicFilter, includeCommits, includePullRequests, parseError = controller.parseQueryParameters(request)
+	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, parseError = controller.parseQueryParameters(request)
 
 	if parseError != nil {
 		http.Error(responseWriter, parseError.Error(), http.StatusBadRequest)
@@ -144,8 +162,8 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 		startTime,
 		endTime,
 		limitCount,
-		repositoryNameFilter,
-		repositoryTopicFilter,
+		repositoryNameFilters,
+		repositoryTopicFilters,
 		includeCommits,
 		includePullRequests,
 	)
@@ -189,13 +207,13 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	var limitCount int
 	var startTime time.Time
 	var endTime time.Time
-	var repositoryNameFilter string
-	var repositoryTopicFilter string
+	var repositoryNameFilters []string
+	var repositoryTopicFilters []string
 	var includeCommits bool
 	var includePullRequests bool
 	var parseError error
 
-	username, limitCount, startTime, endTime, repositoryNameFilter, repositoryTopicFilter, includeCommits, includePullRequests, parseError = controller.parseQueryParameters(request)
+	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, parseError = controller.parseQueryParameters(request)
 
 	if parseError != nil {
 		http.Error(responseWriter, parseError.Error(), http.StatusBadRequest)
@@ -219,8 +237,8 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 		startTime,
 		endTime,
 		limitCount,
-		repositoryNameFilter,
-		repositoryTopicFilter,
+		repositoryNameFilters,
+		repositoryTopicFilters,
 		includeCommits,
 		includePullRequests,
 	)
