@@ -1,0 +1,83 @@
+name: Deploy to Cloud Native
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - '**'
+      - '.github/workflows/deploy-cloud-native.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      ALICLOUD_ACCESS_KEY: ${{ secrets.ALICLOUD_NATIVE_CEO_ACCESS_KEY }}
+      ALICLOUD_SECRET_KEY: ${{ secrets.ALICLOUD_NATIVE_CEO_SECRET_KEY }}
+      ALICLOUD_REGION: "cn-hangzhou"
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: go.sum
+
+      - name: Build Go Binary
+        run: |
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap ./cmd/server
+          chmod +x bootstrap
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Deploy
+        env:
+          TF_VAR_github_api_token: ${{ secrets.APP_GITHUB_TOKEN }}
+        run: |
+          terraform init
+          terraform apply -auto-approve
+          
+          FC_URL=$(terraform output -raw fc_invoke_domain)
+          echo "DYNAMIC_FC_DOMAIN=$FC_URL" >> $GITHUB_ENV
+
+      - name: Register to APISIX
+        if: vars.APISIX_ADMIN_URL != ''
+        run: |
+          # 1. Check if APISIX Admin API is reachable
+          HTTP_CODE=$(curl -o /dev/null -s -w "%{http_code}\n" --connect-timeout 5 \
+            -H "X-API-KEY: ${{ secrets.APISIX_ADMIN_KEY }}" \
+            "${{ vars.APISIX_ADMIN_URL }}/apisix/admin/routes")
+          
+          if [[ "$HTTP_CODE" -ne 200 ]]; then
+            echo "APISIX Admin API not reachable or authorized (HTTP $HTTP_CODE). Skipping registration."
+            exit 0
+          fi
+
+          # 2. Proceed with registration
+          CLEAN_DOMAIN=$(echo $DYNAMIC_FC_DOMAIN | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+          
+          curl -i -X PUT "${{ vars.APISIX_ADMIN_URL }}/apisix/admin/routes/github-profile-readme-postprocessor" \
+            -H "X-API-KEY: ${{ secrets.APISIX_ADMIN_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "name": "github-profile-readme-postprocessor",
+              "uri": "/api/github-profile-readme-postprocessor/*",
+              "plugins": {
+                "proxy-rewrite": {
+                  "regex_uri": ["^/api/github-profile-readme-postprocessor/(.*)", "/$1"]
+                }
+              }
+              "upstream": {
+                "type": "roundrobin",
+                "scheme": "https",
+                "pass_host": "node",
+                "nodes": {
+                  "'"$CLEAN_DOMAIN"'": 1
+                }
+              }
+            }'

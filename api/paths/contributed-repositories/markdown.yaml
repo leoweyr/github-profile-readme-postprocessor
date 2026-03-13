@@ -1,0 +1,101 @@
+get:
+  summary: Get Recently Contributed Repositories with Markdown
+  description: Returns a Markdown list of repositories the user recently contributed to, filtered by criteria.
+
+  tags:
+    - Markdown
+
+  parameters:
+    - in: query
+      name: username
+      schema:
+        type: string
+      required: true
+      description: The GitHub username to fetch activity for.
+
+    # Filtering options.
+
+    - in: query
+      name: limit_count
+      schema:
+        type: integer
+        default: 3
+      description: The maximum number of repositories to return (sorted by latest activity).
+
+    - in: query
+      name: since
+      schema:
+        type: string
+        format: date-time
+      description: The filter for activities occurring after this timestamp (ISO 8601).
+
+    - in: query
+      name: until
+      schema:
+        type: string
+        format: date-time
+      description: The filter for activities occurring before this timestamp (ISO 8601).
+
+    - in: query
+      name: repository_name_contains_any
+      schema:
+        type: array
+        items:
+          type: string
+      style: form
+      explode: true
+      description: The list of substrings to filter repositories by name (case-insensitive, OR logic within this list; combined with repository_topic_contains_any by OR logic).
+
+    - in: query
+      name: repository_topic_contains_any
+      schema:
+        type: array
+        items:
+          type: string
+      style: form
+      explode: true
+      description: The list of substrings to filter repositories by topic (case-insensitive, OR logic within this list; combined with repository_name_contains_any by OR logic).
+
+    # Activity type filters.
+
+    - in: query
+      name: include_commits
+      schema:
+        type: boolean
+        default: true
+      description: Indicates whether to include commit activities.
+
+    - in: query
+      name: include_issues
+      schema:
+        type: boolean
+        default: true
+      description: Indicates whether to include issue activities (opened/commented).
+
+    - in: query
+      name: include_pull_requests
+      schema:
+        type: boolean
+        default: true
+      description: Indicates whether to include pull request activities.
+
+    # Rendering Options.
+
+    - in: query
+      name: title
+      schema:
+        type: string
+        default: "### 📦 Project"
+      description: The custom title for the markdown section.
+
+  responses:
+    '200':
+      description: A Markdown formatted list of repositories.
+      content:
+        text/markdown:
+          schema:
+            type: string
+            example: |
+              ### 📦 Product
+
+              - **[github-profile-readme-postprocessor](https://github.com/leoweyr/github-profile-readme-postprocessor)** `Owned` — A tool that leverages GitHub's built-in features to automatically update your GitHub profile readme file based on your situation and display needs, making the resume of your open-source journey on GitHub more direct, pure, and clear.
