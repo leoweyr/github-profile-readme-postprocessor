@@ -17,6 +17,7 @@ def main() -> None:
     parser.add_argument("--readme_template_path", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--tasks", required=True)
+    parser.add_argument("--sort_latest_activity_blocks", required=False)
 
     arguments: argparse.Namespace = parser.parse_args()
 
@@ -42,6 +43,11 @@ def main() -> None:
     processor: TaskProcessor = TaskProcessor(base_url="http://localhost:8080", username=arguments.username)
     
     any_updated: bool = processor.process_tasks(tasks, updater)
+
+    # Sort latest activity blocks if requested.
+    if arguments.sort_latest_activity_blocks.lower() == "true":
+        updater.sort_latest_activity_blocks()
+        any_updated = True
 
     if any_updated:
         output_path: str = arguments.output

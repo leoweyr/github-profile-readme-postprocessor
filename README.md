@@ -27,6 +27,13 @@ You can use this tool as a GitHub Action to automatically update your profile RE
 > **Security**: All `endpoint` values MUST end with `/markdown`.
 > **Permissions**: Ensure `permissions: contents: write` is set.
 
+| Argument | Description | Required |
+| :--- | :--- | :--- |
+| `github_token` | GitHub Token for API access. | **Yes** |
+| `readme_template_path` | Path to the README template file. | No |
+| `tasks` | JSON list of tasks defining anchors, endpoints, and params. | No |
+| `sort_latest_activity_blocks` | Whether to sort `LATEST_ACTIVITY` blocks by timestamp (descending). | No |
+
 1. **Create Template**
 
    Create a template markdown file (e.g., `README.template.md`) in your repository. Insert the following anchors where you want content:
@@ -60,6 +67,7 @@ You can use this tool as a GitHub Action to automatically update your profile RE
            with:
              github_token: ${{ secrets.GITHUB_TOKEN }}
              readme_template_path: 'README.template.md'  # Your template file.
+             sort_latest_activity_blocks: true
              tasks: |
                [
                  {
