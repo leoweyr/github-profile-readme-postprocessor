@@ -1,9 +1,9 @@
 get:
-  summary: Get Recently Contributed Repositories
-  description: Returns a JSON list of repositories the user recently contributed to, filtered by criteria.
+  summary: Get Recently Contributed Repositories with Markdown
+  description: Returns a Markdown list of repositories the user recently contributed to, filtered by criteria.
 
   tags:
-    - Json
+    - Markdown
 
   parameters:
     - in: query
@@ -71,38 +71,23 @@ get:
         default: true
       description: Indicates whether to include pull request activities.
 
+    # Rendering Options.
+
+    - in: query
+      name: title
+      schema:
+        type: string
+        default: "### 📦 Project"
+      description: The custom title for the markdown section.
+
   responses:
     '200':
-      description: Successful response containing a list of contributed repositories.
-
+      description: A Markdown formatted list of repositories.
       content:
-        application/json:
+        text/markdown:
           schema:
-            type: array
-            items:
-              type: object
-              properties:
-                name:
-                  type: string
-                  description: The full name of the repository (owner/repo).
+            type: string
+            example: |
+              ### 📦 Product
 
-                description:
-                  type: string
-                  description: The description of the repository.
-                
-                active_at:
-                  type: string
-                  format: date-time
-                  description: The timestamp of the most recent activity in this repository.
-                
-
-                
-                is_owner:
-                  type: boolean
-                  description: Indicates whether the user is the owner of the repository.
-              
-              required:
-                - name
-                - description
-                - active_at
-                - is_owner
+              - **[github-profile-readme-postprocessor](https://github.com/leoweyr/github-profile-readme-postprocessor)** `Owned` — A tool that leverages GitHub's built-in features to automatically update your GitHub profile readme file based on your situation and display needs, making the resume of your open-source journey on GitHub more direct, pure, and clear.

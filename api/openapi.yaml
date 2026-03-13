@@ -10,3 +10,6 @@ servers:
 paths:
   /contributed-repositories:
     $ref: './paths/contributed-repositories/endpoint.yaml'
+
+  /contributed-repositories/markdown:
+    $ref: './paths/contributed-repositories/markdown.yaml'
