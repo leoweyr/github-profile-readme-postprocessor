@@ -94,7 +94,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		}
 	}
 
-	var rawNameFilters []string = queryValues["repository_name_contains"]
+	var rawNameFilters []string = queryValues["repository_name_contains_any"]
 	repositoryNameFilters = make([]string, 0)
 
 	var rawFilter string
@@ -115,7 +115,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		}
 	}
 
-	var rawTopicFilters []string = queryValues["repository_topic_contains"]
+	var rawTopicFilters []string = queryValues["repository_topic_contains_any"]
 	repositoryTopicFilters = make([]string, 0)
 
 	for _, rawFilter = range rawTopicFilters {

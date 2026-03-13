@@ -121,20 +121,18 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 		var repositoryName string = parts[1]
 
-		// Filter by repository name (substring match with OR logic).
-		if len(repositoryNameFilters) > 0 {
-			var matchFound bool = false
+		var hasRepositoryNameFilters bool = len(repositoryNameFilters) > 0
+		var hasRepositoryTopicFilters bool = len(repositoryTopicFilters) > 0
+		var repositoryNameMatch bool = false
+
+		if hasRepositoryNameFilters {
 			var filter string
 
 			for _, filter = range repositoryNameFilters {
 				if filter != "" && strings.Contains(strings.ToLower(repositoryFullName), strings.ToLower(filter)) {
-					matchFound = true
+					repositoryNameMatch = true
 					break
 				}
-			}
-
-			if !matchFound {
-				continue
 			}
 		}
 
@@ -148,9 +146,9 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 			continue
 		}
 
-		// Filter by topic (OR logic across topics and filters).
-		if len(repositoryTopicFilters) > 0 {
-			var topicMatch bool = false
+		var repositoryTopicMatch bool = false
+
+		if hasRepositoryTopicFilters {
 			var filter string
 
 			for _, filter = range repositoryTopicFilters {
@@ -162,17 +160,27 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 				for _, topic = range repositoryDetails.Topics {
 					if strings.Contains(strings.ToLower(topic), strings.ToLower(filter)) {
-						topicMatch = true
+						repositoryTopicMatch = true
 						break
 					}
 				}
 
-				if topicMatch {
+				if repositoryTopicMatch {
 					break
 				}
 			}
+		}
 
-			if !topicMatch {
+		if hasRepositoryNameFilters && hasRepositoryTopicFilters {
+			if !repositoryNameMatch && !repositoryTopicMatch {
+				continue
+			}
+		} else if hasRepositoryNameFilters {
+			if !repositoryNameMatch {
+				continue
+			}
+		} else if hasRepositoryTopicFilters {
+			if !repositoryTopicMatch {
 				continue
 			}
 		}

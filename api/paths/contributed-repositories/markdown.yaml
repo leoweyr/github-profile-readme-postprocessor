@@ -37,24 +37,24 @@ get:
       description: The filter for activities occurring before this timestamp (ISO 8601).
 
     - in: query
-      name: repository_name_contains
+      name: repository_name_contains_any
       schema:
         type: array
         items:
           type: string
       style: form
       explode: true
-      description: The list of substrings to filter repositories by name (case-insensitive, OR logic).
+      description: The list of substrings to filter repositories by name (case-insensitive, OR logic within this list; combined with repository_topic_contains_any by OR logic).
 
     - in: query
-      name: repository_topic_contains
+      name: repository_topic_contains_any
       schema:
         type: array
         items:
           type: string
       style: form
       explode: true
-      description: The list of substrings to filter repositories by topic (case-insensitive, OR logic).
+      description: The list of substrings to filter repositories by topic (case-insensitive, OR logic within this list; combined with repository_name_contains_any by OR logic).
 
     # Activity type filters.
 
