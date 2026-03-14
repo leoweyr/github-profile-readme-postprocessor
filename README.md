@@ -1,6 +1,4 @@
-# GitHub Profile Readme Postprocessor
-
-A tool that leverages GitHub's built-in features to automatically update your GitHub profile readme file based on your situation and display needs, making the resume of your open-source journey on GitHub more direct, pure, and clear.
+![github-profile-readme-postprocessor](https://socialify.git.ci/leoweyr/github-profile-readme-postprocessor/image?description=1&font=KoHo&logo=https%3A%2F%2Fraw.githubusercontent.com%2Fleoweyr%2Fgithub-profile-readme-postprocessor%2Frefs%2Fheads%2Fdevelop%2Fassets%2Ficon.svg&name=1&owner=1&pattern=Formal+Invitation&theme=Light)
 
 ## 🏗️ Build
 
