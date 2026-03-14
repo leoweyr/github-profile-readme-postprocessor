@@ -50,6 +50,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 	// Map to track unique repositories and their latest activity time.
 	// Key: "owner/repository".
 	var repositoryActivityMap map[string]time.Time = make(map[string]time.Time)
+	var repositoryLatestActivityMap map[string]*domain.ActivityItem = make(map[string]*domain.ActivityItem)
 
 	// Map to track activity stats for each repository.
 	var repositoryStatsMap map[string]*domain.ActivityStats = make(map[string]*domain.ActivityStats)
@@ -84,6 +85,12 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 			if commit.CommittedAt.After(currentLatest) {
 				repositoryActivityMap[commit.RepositoryName] = commit.CommittedAt
+				repositoryLatestActivityMap[commit.RepositoryName] = &domain.ActivityItem{
+					Type:      domain.ActivityTypeCommit,
+					Title:     commit.Message,
+					URL:       commit.HTMLURL,
+					CreatedAt: commit.CommittedAt,
+				}
 			}
 		}
 	}
@@ -120,6 +127,12 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 			if pullRequest.CreatedAt.After(currentLatest) {
 				repositoryActivityMap[repositoryName] = pullRequest.CreatedAt
+				repositoryLatestActivityMap[repositoryName] = &domain.ActivityItem{
+					Type:      domain.ActivityTypePullRequest,
+					Title:     pullRequest.Title,
+					URL:       pullRequest.HTMLURL,
+					CreatedAt: pullRequest.CreatedAt,
+				}
 			}
 		}
 	}
@@ -152,6 +165,13 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 			if issue.CreatedAt.After(currentLatest) {
 				repositoryActivityMap[repositoryName] = issue.CreatedAt
+				repositoryLatestActivityMap[repositoryName] = &domain.ActivityItem{
+					Type:        domain.ActivityTypeIssue,
+					Title:       issue.Title,
+					URL:         issue.HTMLURL,
+					CreatedAt:   issue.CreatedAt,
+					IssueAction: issue.Action,
+				}
 			}
 		}
 	}
@@ -164,30 +184,30 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 			// Function to calculate stats for a given window.
 			var calculateStatsForWindow func(int) *domain.ActivityStats = func(windowHours int) *domain.ActivityStats {
 				var currentCutoff time.Time = time.Now().Add(-time.Duration(windowHours) * time.Hour)
-				var s *domain.ActivityStats = &domain.ActivityStats{TimeWindow: windowHours}
+				var stats *domain.ActivityStats = &domain.ActivityStats{TimeWindow: windowHours}
 
 				if includeCommits {
-					var c *domain.Commit
+					var commit *domain.Commit
 
-					for _, c = range allCommits {
-						if c.RepositoryName == repoName && c.CommittedAt.After(currentCutoff) {
-							s.CommitCount++
+					for _, commit = range allCommits {
+						if commit.RepositoryName == repoName && commit.CommittedAt.After(currentCutoff) {
+							stats.CommitCount++
 						}
 					}
 				}
 
 				if includePullRequests {
-					var pr *domain.PullRequest
+					var pullRequest *domain.PullRequest
 
-					for _, pr = range allPullRequests {
-						var prRepoName string = pr.RepositoryName
+					for _, pullRequest = range allPullRequests {
+						var prRepoName string = pullRequest.RepositoryName
 
 						if strings.HasPrefix(prRepoName, "https://api.github.com/repos/") {
 							prRepoName = strings.TrimPrefix(prRepoName, "https://api.github.com/repos/")
 						}
 
-						if prRepoName == repoName && pr.CreatedAt.After(currentCutoff) {
-							s.PullRequestCount++
+						if prRepoName == repoName && pullRequest.CreatedAt.After(currentCutoff) {
+							stats.PullRequestCount++
 						}
 					}
 				}
@@ -203,12 +223,12 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 						}
 
 						if issueRepoName == repoName && issue.CreatedAt.After(currentCutoff) {
-							s.IssueCount++
+							stats.IssueCount++
 						}
 					}
 				}
 
-				return s
+				return stats
 			}
 
 			var stats *domain.ActivityStats
@@ -222,11 +242,11 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 				if stats.CommitCount == 0 && stats.IssueCount == 0 && stats.PullRequestCount == 0 {
 					// Try larger windows.
-					var w int
+					var window int
 
-					for _, w = range windows {
-						if w > statsWindowHours {
-							stats = calculateStatsForWindow(w)
+					for _, window = range windows {
+						if window > statsWindowHours {
+							stats = calculateStatsForWindow(window)
 
 							if stats.CommitCount > 0 || stats.IssueCount > 0 || stats.PullRequestCount > 0 {
 								break
@@ -339,18 +359,19 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		var isOwner bool = (strings.EqualFold(repositoryDetails.Owner, username))
 
 		var contributedRepository *domain.ContributedRepository = &domain.ContributedRepository{
-			Repository:    repositoryDetails,
-			ActiveAt:      activeAt,
-			IsOwner:       isOwner,
-			ActivityStats: repositoryStatsMap[repositoryFullName],
+			Repository:     repositoryDetails,
+			ActiveAt:       activeAt,
+			IsOwner:        isOwner,
+			ActivityStats:  repositoryStatsMap[repositoryFullName],
+			LatestActivity: repositoryLatestActivityMap[repositoryFullName],
 		}
 
 		contributedRepositories = append(contributedRepositories, contributedRepository)
 	}
 
 	// 4. Sort by ActiveAt descending.
-	sort.Slice(contributedRepositories, func(i, j int) bool {
-		return contributedRepositories[i].ActiveAt.After(contributedRepositories[j].ActiveAt)
+	sort.Slice(contributedRepositories, func(indexA, indexB int) bool {
+		return contributedRepositories[indexA].ActiveAt.After(contributedRepositories[indexB].ActiveAt)
 	})
 
 	// 5. Apply limit.

@@ -40,6 +40,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 	includeIssues bool,
 	showRecentActivityStats int,
 	adaptiveRecentActivityStats bool,
+	showLatestActivity bool,
 	parseError error,
 ) {
 	var queryValues url.Values = request.URL.Query()
@@ -47,7 +48,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 	username = queryValues.Get("username")
 
 	if username == "" {
-		return "", 0, time.Time{}, time.Time{}, nil, nil, false, false, false, 0, false, fmt.Errorf("missing required parameter: username")
+		return "", 0, time.Time{}, time.Time{}, nil, nil, false, false, false, 0, false, false, fmt.Errorf("missing required parameter: username")
 	}
 
 	limitCount = 3
@@ -99,10 +100,10 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		var cleanRaw string = strings.Trim(rawFilter, "\"")
 		var splits []string = strings.Split(cleanRaw, ",")
 
-		var s string
+		var splitPart string
 
-		for _, s = range splits {
-			var trimmed string = strings.Trim(s, "\"")
+		for _, splitPart = range splits {
+			var trimmed string = strings.Trim(splitPart, "\"")
 			trimmed = strings.TrimSpace(trimmed)
 
 			if trimmed != "" {
@@ -118,10 +119,10 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		var cleanRaw string = strings.Trim(rawFilter, "\"")
 		var splits []string = strings.Split(cleanRaw, ",")
 
-		var s string
+		var splitPart string
 
-		for _, s = range splits {
-			var trimmed string = strings.Trim(s, "\"")
+		for _, splitPart = range splits {
+			var trimmed string = strings.Trim(splitPart, "\"")
 			trimmed = strings.TrimSpace(trimmed)
 			if trimmed != "" {
 				repositoryTopicFilters = append(repositoryTopicFilters, trimmed)
@@ -169,7 +170,84 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		adaptiveRecentActivityStats = true
 	}
 
-	return username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, includeIssues, showRecentActivityStats, adaptiveRecentActivityStats, nil
+	showLatestActivity = false
+	var showLatestValue string = queryValues.Get("show_latest_activity")
+
+	if showLatestValue == "true" {
+		showLatestActivity = true
+	}
+
+	return username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, includeIssues, showRecentActivityStats, adaptiveRecentActivityStats, showLatestActivity, nil
+}
+
+// formatTimeAgo formats the duration since the given time as a human-readable string.
+func (controller *ContributedRepositoriesController) formatTimeAgo(targetTime time.Time) string {
+	var duration time.Duration = time.Since(targetTime)
+	var hours float64 = duration.Hours()
+
+	// Less than 1 hour: use minutes.
+	if hours < 1 {
+		var minutes int = int(duration.Minutes())
+
+		if minutes <= 1 {
+			return "1 minute ago"
+		}
+
+		return fmt.Sprintf("%d minutes ago", minutes)
+	}
+
+	// Less than 24 hours (1 day): use hours.
+	if hours < 24 {
+		var hoursInt int = int(hours)
+
+		if hoursInt == 1 {
+			return "1 hour ago"
+		}
+
+		return fmt.Sprintf("%d hours ago", hoursInt)
+	}
+
+	// Less than 168 hours (7 days / 1 week): use days.
+	if hours < 168 {
+		var days int = int(hours / 24)
+
+		if days == 1 {
+			return "1 day ago"
+		}
+
+		return fmt.Sprintf("%d days ago", days)
+	}
+
+	// Less than 720 hours (30 days / 1 month): use weeks.
+	if hours < 720 {
+		var weeks int = int(hours / 168)
+
+		if weeks == 1 {
+			return "1 week ago"
+		}
+
+		return fmt.Sprintf("%d weeks ago", weeks)
+	}
+
+	// Less than 8760 hours (365 days / 1 year): use months.
+	if hours < 8760 {
+		var months int = int(hours / 720)
+
+		if months == 1 {
+			return "1 month ago"
+		}
+
+		return fmt.Sprintf("%d months ago", months)
+	}
+
+	// More than 1 year: use years.
+	var years int = int(hours / 8760)
+
+	if years == 1 {
+		return "1 year ago"
+	}
+
+	return fmt.Sprintf("%d years ago", years)
 }
 
 // RegisterRoutes registers the controller's endpoints to the provided ServeMux.
@@ -195,7 +273,7 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	var adaptiveRecentActivityStats bool
 	var parseError error
 
-	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, includeIssues, showRecentActivityStats, adaptiveRecentActivityStats, parseError = controller.parseQueryParameters(request)
+	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, includeIssues, showRecentActivityStats, adaptiveRecentActivityStats, _, parseError = controller.parseQueryParameters(request)
 
 	if parseError != nil {
 		http.Error(responseWriter, parseError.Error(), http.StatusBadRequest)
@@ -268,9 +346,10 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	var includeIssues bool
 	var showRecentActivityStats int
 	var adaptiveRecentActivityStats bool
+	var showLatestActivity bool
 	var parseError error
 
-	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, includeIssues, showRecentActivityStats, adaptiveRecentActivityStats, parseError = controller.parseQueryParameters(request)
+	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, includeIssues, showRecentActivityStats, adaptiveRecentActivityStats, showLatestActivity, parseError = controller.parseQueryParameters(request)
 
 	if parseError != nil {
 		http.Error(responseWriter, parseError.Error(), http.StatusBadRequest)
@@ -389,6 +468,54 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 
 				fmt.Fprintf(responseWriter, "  📈 **Past %s:** %s\n\n", timeLabel, strings.Join(stats, " | "))
 			}
+		}
+
+		// Render Latest Activity if requested and present.
+		if showLatestActivity && result.LatestActivity != nil {
+			var emoji string
+			var activityTitle string = result.LatestActivity.Title
+			var activityURL string = result.LatestActivity.URL
+			var timeAgo string = controller.formatTimeAgo(result.LatestActivity.CreatedAt)
+
+			switch result.LatestActivity.Type {
+			case domain.ActivityTypeCommit:
+				emoji = "📌" // Default.
+
+				// Check for conventional commit prefix.
+				var msgLower string = strings.ToLower(activityTitle)
+
+				if strings.HasPrefix(msgLower, "feat") {
+					emoji = "✨"
+				} else if strings.HasPrefix(msgLower, "fix") {
+					emoji = "🐛"
+				} else if strings.HasPrefix(msgLower, "docs") {
+					emoji = "📝"
+				} else if strings.HasPrefix(msgLower, "refactor") {
+					emoji = "♻️"
+				} else if strings.HasPrefix(msgLower, "perf") {
+					emoji = "⏫"
+				} else if strings.HasPrefix(msgLower, "test") {
+					emoji = "🧪"
+				} else if strings.HasPrefix(msgLower, "style") {
+					emoji = "💄"
+				} else if strings.HasPrefix(msgLower, "chore") {
+					emoji = "🧹"
+				} else if strings.HasPrefix(msgLower, "ci") {
+					emoji = "🤖"
+				} else if strings.HasPrefix(msgLower, "revert") {
+					emoji = "⏪"
+				}
+			case domain.ActivityTypePullRequest:
+				emoji = "🔀"
+			case domain.ActivityTypeIssue:
+				if result.LatestActivity.IssueAction == "created" {
+					emoji = "⚠️"
+				} else {
+					emoji = "💬"
+				}
+			}
+
+			fmt.Fprintf(responseWriter, "  %s **Latest:** [%s](%s) (%s)\n\n", emoji, activityTitle, activityURL, timeAgo)
 		}
 	}
 
