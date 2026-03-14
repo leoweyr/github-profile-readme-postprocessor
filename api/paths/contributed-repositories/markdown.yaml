@@ -88,6 +88,12 @@ get:
         default: "### 📦 Project"
       description: The custom title for the markdown section.
 
+    - in: query
+      name: show_recent_activity_stats
+      schema:
+        type: integer
+      description: "The duration in hours to display activity statistics next to the repository name. If 0 or omitted, stats are hidden. (Special labels: 24h -> Day, 168h -> Week, 720h -> Month, 8760h -> Year)"
+
   responses:
     '200':
       description: A Markdown formatted list of repositories.
@@ -100,4 +106,7 @@ get:
               ### 📦 Product
 
               - **[github-profile-readme-postprocessor](https://github.com/leoweyr/github-profile-readme-postprocessor)** `Owned` — A tool that leverages GitHub's built-in features to automatically update your GitHub profile readme file based on your situation and display needs, making the resume of your open-source journey on GitHub more direct, pure, and clear.
+                
+                📈 **Past Month:** 48 Commits
+              
               <!-- LATEST_ACTIVITY_END -->

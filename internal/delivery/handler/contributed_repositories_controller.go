@@ -27,13 +27,6 @@ func NewContributedRepositoriesController(useCase *usecase.ContributedRepositori
 	}
 }
 
-// RegisterRoutes registers the controller's endpoints to the provided ServeMux.
-func (controller *ContributedRepositoriesController) RegisterRoutes(router *http.ServeMux) {
-	// Explicitly map HTTP verbs and paths.
-	router.HandleFunc("GET /v1/contributed-repositories", controller.HandleGetContributedRepositories)
-	router.HandleFunc("GET /v1/contributed-repositories/markdown", controller.HandleGetContributedRepositoriesMarkdown)
-}
-
 // parseQueryParameters extracts and validates common query parameters.
 func (controller *ContributedRepositoriesController) parseQueryParameters(request *http.Request) (
 	username string,
@@ -44,14 +37,15 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 	repositoryTopicFilters []string,
 	includeCommits bool,
 	includePullRequests bool,
-	err error,
+	showRecentActivityStats int,
+	parseError error,
 ) {
 	var queryValues url.Values = request.URL.Query()
 
 	username = queryValues.Get("username")
 
 	if username == "" {
-		return "", 0, time.Time{}, time.Time{}, nil, nil, false, false, fmt.Errorf("missing required parameter: username")
+		return "", 0, time.Time{}, time.Time{}, nil, nil, false, false, 0, fmt.Errorf("missing required parameter: username")
 	}
 
 	limitCount = 3
@@ -147,7 +141,26 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		includePullRequests = false
 	}
 
-	return username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, nil
+	showRecentActivityStats = 0
+	value = queryValues.Get("show_recent_activity_stats")
+
+	if value != "" {
+		var parsed int
+		var conversionError error
+		parsed, conversionError = strconv.Atoi(value)
+		if conversionError == nil && parsed >= 0 {
+			showRecentActivityStats = parsed
+		}
+	}
+
+	return username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, showRecentActivityStats, nil
+}
+
+// RegisterRoutes registers the controller's endpoints to the provided ServeMux.
+func (controller *ContributedRepositoriesController) RegisterRoutes(router *http.ServeMux) {
+	// Explicitly map HTTP verbs and paths.
+	router.HandleFunc("GET /v1/contributed-repositories", controller.HandleGetContributedRepositories)
+	router.HandleFunc("GET /v1/contributed-repositories/markdown", controller.HandleGetContributedRepositoriesMarkdown)
 }
 
 // HandleGetContributedRepositories handles the request to get recently contributed repositories.
@@ -161,9 +174,10 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	var repositoryTopicFilters []string
 	var includeCommits bool
 	var includePullRequests bool
+	var showRecentActivityStats int
 	var parseError error
 
-	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, parseError = controller.parseQueryParameters(request)
+	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, showRecentActivityStats, parseError = controller.parseQueryParameters(request)
 
 	if parseError != nil {
 		http.Error(responseWriter, parseError.Error(), http.StatusBadRequest)
@@ -185,6 +199,7 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 		repositoryTopicFilters,
 		includeCommits,
 		includePullRequests,
+		showRecentActivityStats,
 	)
 
 	if executeError != nil {
@@ -230,9 +245,10 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	var repositoryTopicFilters []string
 	var includeCommits bool
 	var includePullRequests bool
+	var showRecentActivityStats int
 	var parseError error
 
-	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, parseError = controller.parseQueryParameters(request)
+	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, showRecentActivityStats, parseError = controller.parseQueryParameters(request)
 
 	if parseError != nil {
 		http.Error(responseWriter, parseError.Error(), http.StatusBadRequest)
@@ -260,6 +276,7 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 		repositoryTopicFilters,
 		includeCommits,
 		includePullRequests,
+		showRecentActivityStats,
 	)
 
 	if executeError != nil {
@@ -296,19 +313,52 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 
 		// - **[RepoName](RepoURL)** `Owned` — Description.
 		// If description is empty, don't print the dash.
+		var descriptionPart string = ""
+
 		if result.Repository.Description != "" {
-			fmt.Fprintf(responseWriter, "- **[%s](%s)**%s — %s\n\n",
-				result.Repository.Name,
-				result.Repository.HTMLURL,
-				ownedTag,
-				result.Repository.Description,
-			)
-		} else {
-			fmt.Fprintf(responseWriter, "- **[%s](%s)**%s\n\n",
-				result.Repository.Name,
-				result.Repository.HTMLURL,
-				ownedTag,
-			)
+			descriptionPart = fmt.Sprintf(" — %s", result.Repository.Description)
+		}
+
+		fmt.Fprintf(responseWriter, "- **[%s](%s)**%s%s\n\n",
+			result.Repository.Name,
+			result.Repository.HTMLURL,
+			ownedTag,
+			descriptionPart,
+		)
+
+		// Render Activity Stats if present.
+		if result.ActivityStats != nil {
+			var stats []string
+
+			if result.ActivityStats.CommitCount > 0 && includeCommits {
+				stats = append(stats, fmt.Sprintf("%d Commits", result.ActivityStats.CommitCount))
+			}
+			// Note: Assuming IssueCount and PullRequestCount logic from usecase.
+			// Currently usecase groups everything under PullRequestCount for PR fetcher,
+			// but issue fetching isn't explicitly separated yet.
+			// Using PullRequestCount here.
+			if result.ActivityStats.PullRequestCount > 0 && includePullRequests {
+				stats = append(stats, fmt.Sprintf("%d Pull Requests", result.ActivityStats.PullRequestCount))
+			}
+			if result.ActivityStats.IssueCount > 0 {
+				stats = append(stats, fmt.Sprintf("%d Issues", result.ActivityStats.IssueCount))
+			}
+
+			if len(stats) > 0 {
+				var timeLabel string = "Stats"
+				switch showRecentActivityStats {
+				case 24:
+					timeLabel = "Day"
+				case 168:
+					timeLabel = "Week"
+				case 720:
+					timeLabel = "Month"
+				case 8760:
+					timeLabel = "Year"
+				}
+
+				fmt.Fprintf(responseWriter, "  📈 **Past %s:** %s\n\n", timeLabel, strings.Join(stats, " | "))
+			}
 		}
 	}
 

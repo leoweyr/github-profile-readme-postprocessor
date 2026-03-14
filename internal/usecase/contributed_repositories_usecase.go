@@ -33,16 +33,25 @@ func NewContributedRepositoriesUseCase(
 func (useCase *ContributedRepositoriesUseCase) Execute(
 	context context.Context,
 	username string,
-	startTime, endTime time.Time,
-	limit int,
+	startTime time.Time,
+	endTime time.Time,
+	limitCount int,
 	repositoryNameFilters []string,
 	repositoryTopicFilters []string,
 	includeCommits bool,
 	includePullRequests bool,
+	recentActivityStatsHours int,
 ) ([]*domain.ContributedRepository, error) {
 	// Map to track unique repositories and their latest activity time.
 	// Key: "owner/repository".
 	var repositoryActivityMap map[string]time.Time = make(map[string]time.Time)
+	var repositoryStatsMap map[string]*domain.ActivityStats = make(map[string]*domain.ActivityStats)
+
+	// Define stats cutoff time.
+	var statsCutoffTime time.Time
+	if recentActivityStatsHours > 0 {
+		statsCutoffTime = time.Now().Add(-time.Duration(recentActivityStatsHours) * time.Hour)
+	}
 
 	// 1. Fetch Commits if requested.
 	if includeCommits {
@@ -65,6 +74,15 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 			if commit.CommittedAt.After(currentLatest) {
 				repositoryActivityMap[commit.RepositoryName] = commit.CommittedAt
+			}
+
+			// Calculate stats.
+			if recentActivityStatsHours > 0 && commit.CommittedAt.After(statsCutoffTime) {
+				if repositoryStatsMap[commit.RepositoryName] == nil {
+					repositoryStatsMap[commit.RepositoryName] = &domain.ActivityStats{}
+				}
+
+				repositoryStatsMap[commit.RepositoryName].CommitCount++
 			}
 		}
 	}
@@ -100,6 +118,15 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 			if pullRequest.CreatedAt.After(currentLatest) {
 				repositoryActivityMap[repositoryName] = pullRequest.CreatedAt
+			}
+
+			// Calculate stats.
+			if recentActivityStatsHours > 0 && pullRequest.CreatedAt.After(statsCutoffTime) {
+				if repositoryStatsMap[repositoryName] == nil {
+					repositoryStatsMap[repositoryName] = &domain.ActivityStats{}
+				}
+
+				repositoryStatsMap[repositoryName].PullRequestCount++
 			}
 		}
 	}
@@ -188,9 +215,10 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		var isOwner bool = (strings.EqualFold(repositoryDetails.Owner, username))
 
 		var contributedRepository *domain.ContributedRepository = &domain.ContributedRepository{
-			Repository: repositoryDetails,
-			ActiveAt:   activeAt,
-			IsOwner:    isOwner,
+			Repository:    repositoryDetails,
+			ActiveAt:      activeAt,
+			IsOwner:       isOwner,
+			ActivityStats: repositoryStatsMap[repositoryFullName],
 		}
 
 		contributedRepositories = append(contributedRepositories, contributedRepository)
@@ -202,8 +230,8 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 	})
 
 	// 5. Apply limit.
-	if limit > 0 && len(contributedRepositories) > limit {
-		contributedRepositories = contributedRepositories[:limit]
+	if limitCount > 0 && len(contributedRepositories) > limitCount {
+		contributedRepositories = contributedRepositories[:limitCount]
 	}
 
 	return contributedRepositories, nil

@@ -6,7 +6,8 @@ import (
 
 // ContributedRepository represents a repository that the user has contributed to, with activity metadata.
 type ContributedRepository struct {
-	Repository *Repository
-	ActiveAt   time.Time
-	IsOwner    bool
+	Repository    *Repository
+	ActiveAt      time.Time
+	IsOwner       bool
+	ActivityStats *ActivityStats
 }
