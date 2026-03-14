@@ -85,9 +85,17 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 			if commit.CommittedAt.After(currentLatest) {
 				repositoryActivityMap[commit.RepositoryName] = commit.CommittedAt
+
+				// Only use the first line of the commit message for the title.
+				var title string = commit.Message
+
+				if index := strings.Index(title, "\n"); index != -1 {
+					title = title[:index]
+				}
+
 				repositoryLatestActivityMap[commit.RepositoryName] = &domain.ActivityItem{
 					Type:      domain.ActivityTypeCommit,
-					Title:     commit.Message,
+					Title:     title,
 					URL:       commit.HTMLURL,
 					CreatedAt: commit.CommittedAt,
 				}
