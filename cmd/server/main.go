@@ -31,12 +31,14 @@ func main() {
 
 	// 2. Instantiate Dependencies (Gateways).
 	var commitFetcher *fetcher.CommitFetcher = fetcher.NewCommitFetcher(githubToken)
+	var issueFetcher *fetcher.IssueActivityFetcher = fetcher.NewIssueActivityFetcher(githubToken)
 	var prFetcher *fetcher.PullRequestFetcher = fetcher.NewPullRequestFetcher(githubToken)
 	var repoFetcher *fetcher.RepositoryFetcher = fetcher.NewRepositoryFetcher(githubToken)
 
 	// 3. Instantiate Use Cases.
 	var contributedReposUseCase *usecase.ContributedRepositoriesUseCase = usecase.NewContributedRepositoriesUseCase(
 		commitFetcher,
+		issueFetcher,
 		prFetcher,
 		repoFetcher,
 	)

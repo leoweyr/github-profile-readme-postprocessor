@@ -12,6 +12,7 @@ import (
 // ContributedRepositoriesUseCase orchestrates the retrieval of contributed repositories.
 type ContributedRepositoriesUseCase struct {
 	commitFetcher      CommitFetcher
+	issueFetcher       IssueFetcher
 	pullRequestFetcher PullRequestFetcher
 	repositoryFetcher  RepositoryFetcher
 }
@@ -19,11 +20,13 @@ type ContributedRepositoriesUseCase struct {
 // NewContributedRepositoriesUseCase creates a new instance of ContributedRepositoriesUseCase.
 func NewContributedRepositoriesUseCase(
 	commitFetcher CommitFetcher,
+	issueFetcher IssueFetcher,
 	pullRequestFetcher PullRequestFetcher,
 	repositoryFetcher RepositoryFetcher,
 ) *ContributedRepositoriesUseCase {
 	return &ContributedRepositoriesUseCase{
 		commitFetcher:      commitFetcher,
+		issueFetcher:       issueFetcher,
 		pullRequestFetcher: pullRequestFetcher,
 		repositoryFetcher:  repositoryFetcher,
 	}
@@ -39,6 +42,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 	repositoryNameFilters []string,
 	repositoryTopicFilters []string,
 	includeCommits bool,
+	includeIssues bool,
 	includePullRequests bool,
 	recentActivityStatsHours int,
 	adaptiveRecentActivityStats bool,
@@ -120,6 +124,38 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		}
 	}
 
+	// 3. Fetch Issues if requested.
+	var allIssues []*domain.Issue
+
+	if includeIssues {
+		var issueError error
+		allIssues, issueError = useCase.issueFetcher.FetchIssueActivities(context, username, startTime, endTime)
+
+		if issueError != nil {
+			return nil, issueError
+		}
+
+		var issue *domain.Issue
+
+		for _, issue = range allIssues {
+			var repositoryName string = issue.RepositoryName
+
+			if strings.HasPrefix(repositoryName, "https://api.github.com/repos/") {
+				repositoryName = strings.TrimPrefix(repositoryName, "https://api.github.com/repos/")
+			}
+
+			if repositoryName == "" {
+				continue
+			}
+
+			var currentLatest time.Time = repositoryActivityMap[repositoryName]
+
+			if issue.CreatedAt.After(currentLatest) {
+				repositoryActivityMap[repositoryName] = issue.CreatedAt
+			}
+		}
+	}
+
 	// 3. Process Stats per Repository.
 	if recentActivityStatsHours > 0 || adaptiveRecentActivityStats {
 		var repoName string
@@ -152,6 +188,22 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 						if prRepoName == repoName && pr.CreatedAt.After(currentCutoff) {
 							s.PullRequestCount++
+						}
+					}
+				}
+
+				if includeIssues {
+					var issue *domain.Issue
+
+					for _, issue = range allIssues {
+						var issueRepoName string = issue.RepositoryName
+
+						if strings.HasPrefix(issueRepoName, "https://api.github.com/repos/") {
+							issueRepoName = strings.TrimPrefix(issueRepoName, "https://api.github.com/repos/")
+						}
+
+						if issueRepoName == repoName && issue.CreatedAt.After(currentCutoff) {
+							s.IssueCount++
 						}
 					}
 				}

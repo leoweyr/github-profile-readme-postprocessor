@@ -37,6 +37,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 	repositoryTopicFilters []string,
 	includeCommits bool,
 	includePullRequests bool,
+	includeIssues bool,
 	showRecentActivityStats int,
 	adaptiveRecentActivityStats bool,
 	parseError error,
@@ -46,7 +47,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 	username = queryValues.Get("username")
 
 	if username == "" {
-		return "", 0, time.Time{}, time.Time{}, nil, nil, false, false, 0, false, fmt.Errorf("missing required parameter: username")
+		return "", 0, time.Time{}, time.Time{}, nil, nil, false, false, false, 0, false, fmt.Errorf("missing required parameter: username")
 	}
 
 	limitCount = 3
@@ -142,6 +143,13 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		includePullRequests = false
 	}
 
+	includeIssues = true
+	value = queryValues.Get("include_issues")
+
+	if value == "false" {
+		includeIssues = false
+	}
+
 	showRecentActivityStats = 0
 	value = queryValues.Get("show_recent_activity_stats")
 
@@ -161,7 +169,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		adaptiveRecentActivityStats = true
 	}
 
-	return username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, showRecentActivityStats, adaptiveRecentActivityStats, nil
+	return username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, includeIssues, showRecentActivityStats, adaptiveRecentActivityStats, nil
 }
 
 // RegisterRoutes registers the controller's endpoints to the provided ServeMux.
@@ -182,11 +190,12 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	var repositoryTopicFilters []string
 	var includeCommits bool
 	var includePullRequests bool
+	var includeIssues bool
 	var showRecentActivityStats int
 	var adaptiveRecentActivityStats bool
 	var parseError error
 
-	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, showRecentActivityStats, adaptiveRecentActivityStats, parseError = controller.parseQueryParameters(request)
+	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, includeIssues, showRecentActivityStats, adaptiveRecentActivityStats, parseError = controller.parseQueryParameters(request)
 
 	if parseError != nil {
 		http.Error(responseWriter, parseError.Error(), http.StatusBadRequest)
@@ -208,6 +217,7 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 		repositoryTopicFilters,
 		includeCommits,
 		includePullRequests,
+		includeIssues,
 		showRecentActivityStats,
 		adaptiveRecentActivityStats,
 	)
@@ -255,11 +265,12 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	var repositoryTopicFilters []string
 	var includeCommits bool
 	var includePullRequests bool
+	var includeIssues bool
 	var showRecentActivityStats int
 	var adaptiveRecentActivityStats bool
 	var parseError error
 
-	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, showRecentActivityStats, adaptiveRecentActivityStats, parseError = controller.parseQueryParameters(request)
+	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, includeIssues, showRecentActivityStats, adaptiveRecentActivityStats, parseError = controller.parseQueryParameters(request)
 
 	if parseError != nil {
 		http.Error(responseWriter, parseError.Error(), http.StatusBadRequest)
@@ -287,6 +298,7 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 		repositoryTopicFilters,
 		includeCommits,
 		includePullRequests,
+		includeIssues,
 		showRecentActivityStats,
 		adaptiveRecentActivityStats,
 	)
@@ -352,7 +364,7 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 			if result.ActivityStats.PullRequestCount > 0 && includePullRequests {
 				stats = append(stats, fmt.Sprintf("%d Pull Requests", result.ActivityStats.PullRequestCount))
 			}
-			if result.ActivityStats.IssueCount > 0 {
+			if result.ActivityStats.IssueCount > 0 && includeIssues {
 				stats = append(stats, fmt.Sprintf("%d Issues", result.ActivityStats.IssueCount))
 			}
 
