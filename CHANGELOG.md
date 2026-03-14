@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+# [0.2.1](https://github.com/leoweyr/github-profile-readme-postprocessor/compare/v0.2.0...v0.2.1) (2026-03-14)
+### Bug Fixes
+
+* **github-action-app:** convert boolean parameters to lowercase strings for Go server compatibility ([074fc85](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/074fc85ae45c1c261fd85afb88c58079a6a1a0b5)) [@leoweyr](https://github.com/leoweyr)
+
+
+### Features
+
+* **github-action-app:** add debug logging for fetched content ([12b6c84](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/12b6c8408fc33eda2ac739941c2ffd8cc5848e57)) [@leoweyr](https://github.com/leoweyr)
+* **github-action-app:** add include request URL in debug log output ([2859341](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/2859341ec9ea8e0e72611e1fe5efced3f9d824c0)) [@leoweyr](https://github.com/leoweyr)
+
+
+
 # [0.1.0] (2026-03-13)
 ### Bug Fixes
 
