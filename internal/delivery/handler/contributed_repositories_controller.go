@@ -38,6 +38,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 	includeCommits bool,
 	includePullRequests bool,
 	showRecentActivityStats int,
+	adaptiveRecentActivityStats bool,
 	parseError error,
 ) {
 	var queryValues url.Values = request.URL.Query()
@@ -45,7 +46,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 	username = queryValues.Get("username")
 
 	if username == "" {
-		return "", 0, time.Time{}, time.Time{}, nil, nil, false, false, 0, fmt.Errorf("missing required parameter: username")
+		return "", 0, time.Time{}, time.Time{}, nil, nil, false, false, 0, false, fmt.Errorf("missing required parameter: username")
 	}
 
 	limitCount = 3
@@ -153,7 +154,14 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		}
 	}
 
-	return username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, showRecentActivityStats, nil
+	adaptiveRecentActivityStats = false
+	var adaptiveValue string = queryValues.Get("adaptive_show_recent_activity_stats")
+
+	if adaptiveValue == "true" {
+		adaptiveRecentActivityStats = true
+	}
+
+	return username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, showRecentActivityStats, adaptiveRecentActivityStats, nil
 }
 
 // RegisterRoutes registers the controller's endpoints to the provided ServeMux.
@@ -175,9 +183,10 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	var includeCommits bool
 	var includePullRequests bool
 	var showRecentActivityStats int
+	var adaptiveRecentActivityStats bool
 	var parseError error
 
-	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, showRecentActivityStats, parseError = controller.parseQueryParameters(request)
+	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, showRecentActivityStats, adaptiveRecentActivityStats, parseError = controller.parseQueryParameters(request)
 
 	if parseError != nil {
 		http.Error(responseWriter, parseError.Error(), http.StatusBadRequest)
@@ -185,12 +194,12 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	}
 
 	// 2. Call Core Business Logic (Service Layer).
-	var context context.Context = request.Context()
+	var requestContext context.Context = request.Context()
 	var results []*domain.ContributedRepository
 	var executeError error
 
 	results, executeError = controller.useCase.Execute(
-		context,
+		requestContext,
 		username,
 		startTime,
 		endTime,
@@ -200,6 +209,7 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 		includeCommits,
 		includePullRequests,
 		showRecentActivityStats,
+		adaptiveRecentActivityStats,
 	)
 
 	if executeError != nil {
@@ -246,9 +256,10 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	var includeCommits bool
 	var includePullRequests bool
 	var showRecentActivityStats int
+	var adaptiveRecentActivityStats bool
 	var parseError error
 
-	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, showRecentActivityStats, parseError = controller.parseQueryParameters(request)
+	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, showRecentActivityStats, adaptiveRecentActivityStats, parseError = controller.parseQueryParameters(request)
 
 	if parseError != nil {
 		http.Error(responseWriter, parseError.Error(), http.StatusBadRequest)
@@ -262,12 +273,12 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	}
 
 	// 2. Call Core Business Logic (Service Layer).
-	var context context.Context = request.Context()
+	var requestContext context.Context = request.Context()
 	var results []*domain.ContributedRepository
 	var executeError error
 
 	results, executeError = controller.useCase.Execute(
-		context,
+		requestContext,
 		username,
 		startTime,
 		endTime,
@@ -277,6 +288,7 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 		includeCommits,
 		includePullRequests,
 		showRecentActivityStats,
+		adaptiveRecentActivityStats,
 	)
 
 	if executeError != nil {
@@ -346,7 +358,13 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 
 			if len(stats) > 0 {
 				var timeLabel string = "Stats"
-				switch showRecentActivityStats {
+				var displayWindow int = showRecentActivityStats
+
+				if result.ActivityStats.TimeWindow > 0 {
+					displayWindow = result.ActivityStats.TimeWindow
+				}
+
+				switch displayWindow {
 				case 24:
 					timeLabel = "Day"
 				case 168:

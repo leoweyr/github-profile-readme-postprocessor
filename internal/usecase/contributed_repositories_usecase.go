@@ -41,23 +41,29 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 	includeCommits bool,
 	includePullRequests bool,
 	recentActivityStatsHours int,
+	adaptiveRecentActivityStats bool,
 ) ([]*domain.ContributedRepository, error) {
 	// Map to track unique repositories and their latest activity time.
 	// Key: "owner/repository".
 	var repositoryActivityMap map[string]time.Time = make(map[string]time.Time)
+
+	// Map to track activity stats for each repository.
 	var repositoryStatsMap map[string]*domain.ActivityStats = make(map[string]*domain.ActivityStats)
 
-	// Define stats cutoff time.
-	var statsCutoffTime time.Time
-	if recentActivityStatsHours > 0 {
-		statsCutoffTime = time.Now().Add(-time.Duration(recentActivityStatsHours) * time.Hour)
+	// Determine initial time window for stats.
+	var statsWindowHours int = recentActivityStatsHours
+
+	if statsWindowHours <= 0 {
+		statsWindowHours = 24 // Default to 24h if not specified.
 	}
 
+	// Fetch all activities first to support adaptive windows.
 	// 1. Fetch Commits if requested.
+	var allCommits []*domain.Commit
+
 	if includeCommits {
-		var commits []*domain.Commit
 		var commitError error
-		commits, commitError = useCase.commitFetcher.FetchCommits(context, username, startTime, endTime)
+		allCommits, commitError = useCase.commitFetcher.FetchCommits(context, username, startTime, endTime)
 
 		if commitError != nil {
 			return nil, commitError
@@ -65,7 +71,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 		var commit *domain.Commit
 
-		for _, commit = range commits {
+		for _, commit = range allCommits {
 			if commit.RepositoryName == "" {
 				continue
 			}
@@ -75,23 +81,15 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 			if commit.CommittedAt.After(currentLatest) {
 				repositoryActivityMap[commit.RepositoryName] = commit.CommittedAt
 			}
-
-			// Calculate stats.
-			if recentActivityStatsHours > 0 && commit.CommittedAt.After(statsCutoffTime) {
-				if repositoryStatsMap[commit.RepositoryName] == nil {
-					repositoryStatsMap[commit.RepositoryName] = &domain.ActivityStats{}
-				}
-
-				repositoryStatsMap[commit.RepositoryName].CommitCount++
-			}
 		}
 	}
 
 	// 2. Fetch Pull Requests if requested.
+	var allPullRequests []*domain.PullRequest
+
 	if includePullRequests {
-		var pullRequests []*domain.PullRequest
 		var pullRequestError error
-		pullRequests, pullRequestError = useCase.pullRequestFetcher.FetchPullRequests(context, username, startTime, endTime)
+		allPullRequests, pullRequestError = useCase.pullRequestFetcher.FetchPullRequests(context, username, startTime, endTime)
 
 		if pullRequestError != nil {
 			return nil, pullRequestError
@@ -99,7 +97,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 		var pullRequest *domain.PullRequest
 
-		for _, pullRequest = range pullRequests {
+		for _, pullRequest = range allPullRequests {
 			// Parsing repository name from URL or field.
 			// The fetcher should populate RepositoryName.
 			var repositoryName string = pullRequest.RepositoryName
@@ -119,19 +117,93 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 			if pullRequest.CreatedAt.After(currentLatest) {
 				repositoryActivityMap[repositoryName] = pullRequest.CreatedAt
 			}
+		}
+	}
 
-			// Calculate stats.
-			if recentActivityStatsHours > 0 && pullRequest.CreatedAt.After(statsCutoffTime) {
-				if repositoryStatsMap[repositoryName] == nil {
-					repositoryStatsMap[repositoryName] = &domain.ActivityStats{}
+	// 3. Process Stats per Repository.
+	if recentActivityStatsHours > 0 || adaptiveRecentActivityStats {
+		var repoName string
+		for repoName = range repositoryActivityMap {
+
+			// Function to calculate stats for a given window.
+			var calculateStatsForWindow func(int) *domain.ActivityStats = func(windowHours int) *domain.ActivityStats {
+				var currentCutoff time.Time = time.Now().Add(-time.Duration(windowHours) * time.Hour)
+				var s *domain.ActivityStats = &domain.ActivityStats{TimeWindow: windowHours}
+
+				if includeCommits {
+					var c *domain.Commit
+
+					for _, c = range allCommits {
+						if c.RepositoryName == repoName && c.CommittedAt.After(currentCutoff) {
+							s.CommitCount++
+						}
+					}
 				}
 
-				repositoryStatsMap[repositoryName].PullRequestCount++
+				if includePullRequests {
+					var pr *domain.PullRequest
+
+					for _, pr = range allPullRequests {
+						var prRepoName string = pr.RepositoryName
+
+						if strings.HasPrefix(prRepoName, "https://api.github.com/repos/") {
+							prRepoName = strings.TrimPrefix(prRepoName, "https://api.github.com/repos/")
+						}
+
+						if prRepoName == repoName && pr.CreatedAt.After(currentCutoff) {
+							s.PullRequestCount++
+						}
+					}
+				}
+
+				return s
+			}
+
+			var stats *domain.ActivityStats
+
+			if adaptiveRecentActivityStats {
+				// Windows to check: current default -> Day -> Week -> Month -> Year.
+				var windows []int = []int{24, 168, 720, 8760}
+
+				// Check initial window first.
+				stats = calculateStatsForWindow(statsWindowHours)
+
+				if stats.CommitCount == 0 && stats.IssueCount == 0 && stats.PullRequestCount == 0 {
+					// Try larger windows.
+					var w int
+
+					for _, w = range windows {
+						if w > statsWindowHours {
+							stats = calculateStatsForWindow(w)
+
+							if stats.CommitCount > 0 || stats.IssueCount > 0 || stats.PullRequestCount > 0 {
+								break
+							}
+						}
+					}
+
+					// If still no activity found in the largest window (Year), fallback to All Time.
+					// Use 0 to represent All Time (Past Stats).
+					if stats.CommitCount == 0 && stats.IssueCount == 0 && stats.PullRequestCount == 0 {
+						stats = calculateStatsForWindow(0)
+					}
+				}
+			} else {
+				// Fixed window.
+				stats = calculateStatsForWindow(statsWindowHours)
+			}
+
+			// Store stats if requested (even if empty, but logic usually implies showing stats).
+			// If adaptive and still empty, we might choose to hide it or show "0 in past Year".
+			// Requirement: "If no activity found even in the Year window, stats are hidden."
+			// So only add if non-zero.
+			if stats.CommitCount > 0 || stats.IssueCount > 0 || stats.PullRequestCount > 0 {
+				repositoryStatsMap[repoName] = stats
 			}
 		}
 	}
 
-	// 3. Fetch details for each unique repository.
+	// 4. Fetch details for each unique repository.
 	var contributedRepositories []*domain.ContributedRepository
 
 	var repositoryFullName string

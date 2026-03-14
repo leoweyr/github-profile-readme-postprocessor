@@ -94,6 +94,21 @@ get:
         type: integer
       description: "The duration in hours to display activity statistics next to the repository name. If 0 or omitted, stats are hidden. (Special labels: 24h -> Day, 168h -> Week, 720h -> Month, 8760h -> Year)"
 
+    - in: query
+      name: adaptive_show_recent_activity_stats
+      schema:
+        type: boolean
+        default: false
+      description: |
+        If true, adaptively determines the best time window for showing activity stats.
+        
+        Logic:
+        1. Starts checking from the window defined by `show_recent_activity_stats` (or defaults to 24h if 0/unset).
+        2. Checks windows in this order: Day (24h) -> Week (168h) -> Month (720h) -> Year (8760h).
+        3. If no activity is found in the current window, it expands to the next larger window.
+        4. If activity is found, it displays stats for that window.
+        5. If no activity is found even in the Year window, it falls back to showing all stats since the beginning of the query period (labeled "Past Stats").
+
   responses:
     '200':
       description: A Markdown formatted list of repositories.
