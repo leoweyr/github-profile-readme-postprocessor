@@ -2,6 +2,10 @@ name: 'GitHub Profile Readme Postprocessor Action'
 description: 'Automatically update your GitHub profile README with your recent activity and repository insights using a local Go server.'
 author: 'leoweyr'
 
+branding:
+  icon: 'layout'
+  color: 'blue'
+
 inputs:
   readme_template_path:
     description: 'Path to the README template file.'
@@ -10,6 +14,10 @@ inputs:
   github_token:
     description: 'GitHub Token for API access'
     required: true
+  sort_latest_activity_blocks:
+    description: 'Whether to sort the LATEST_ACTIVITY blocks in descending order by timestamp.'
+    required: false
+    default: 'false'
   tasks:
     description: 'JSON list of tasks. Each task defines an anchor, endpoint, and specific params. Example: [{"anchor": "<!-- REPOS -->", "endpoint": "/v1/contributed-repositories/markdown", "params": {"limit_count": 5}}]'
     required: false
@@ -62,6 +70,7 @@ runs:
           --username "${{ github.repository_owner }}" \
           --readme_template_path "${{ inputs.readme_template_path }}" \
           --output "README.md" \
+          --sort_latest_activity_blocks "${{ inputs.sort_latest_activity_blocks }}" \
           --tasks '${{ inputs.tasks }}'
 
     - name: Stop Server

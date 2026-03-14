@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+# [0.2.0](https://github.com/leoweyr/github-profile-readme-postprocessor/compare/v0.1.0...v0.2.0) (2026-03-14)
+### Bug Fixes
+
+* **contributed-repositories-markdown:** include user issues in activity statistics ([8b0b5b4](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/8b0b5b4832e3560f6b91ecf130a471ac77af889f)) [@leoweyr](https://github.com/leoweyr)
+
+
+### Features
+
+* **contributed-repositories-markdown:** add activity timestamp to markdown response ([a97b2ad](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/a97b2adc7c298238124997e73ff28656cdea9cec)) [@leoweyr](https://github.com/leoweyr)
+* **github-action-app:** support sorting activity blocks by timestamp ([d3de7d1](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/d3de7d1006e4e0ed9f7aaf5bbefbdaa66fdcb5f4)) [@leoweyr](https://github.com/leoweyr)
+* **contributed-repositories-markdown:** add recent activity stats ([22b499c](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/22b499c2460d398ff6c6dfbd49887c02a9b6ea48)) [@leoweyr](https://github.com/leoweyr)
+* **contributed-repositories-markdown:** add adaptive recent activity stats ([c6a755a](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/c6a755a55136cb24ce5e4564582f499de6c8b03b)) [@leoweyr](https://github.com/leoweyr)
+* **contributed-repositories-markdown:** add show latest activity ([1db7fac](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/1db7facdf18526ef533898017fd9c5eda56c4698)) [@leoweyr](https://github.com/leoweyr)
+
+
+### Documentation
+
+* **readme:** add banner ([70b5c7a](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/70b5c7a0b8ad4e0ef7be9b447bb3f1ab020c9ff0)) [@leoweyr](https://github.com/leoweyr)
+
+
+### Miscellaneous Tasks
+
+* add icon ([8a80d54](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/8a80d5412851dd6ff6846916191545a6384ebb40)) [@leoweyr](https://github.com/leoweyr)
+* add branding configuration for marketplace release ([eacb847](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/eacb8474c900ca39418828b920a123d5f22e7327)) [@leoweyr](https://github.com/leoweyr)
+
+
+
 # [0.1.0] (2026-03-13)
 ### Bug Fixes
 

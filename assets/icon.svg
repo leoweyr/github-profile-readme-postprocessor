@@ -1,0 +1,120 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Styles -->
+  <defs>
+    <!-- Vibrant Purple Gradient for the Octopus Body -->
+    <radialGradient id="bodyGrad" cx="30%" cy="30%" r="70%" fx="30%" fy="30%">
+      <stop offset="0%" style="stop-color:#9f7aea;stop-opacity:1" /> <!-- Lighter Purple -->
+      <stop offset="100%" style="stop-color:#553c9a;stop-opacity:1" /> <!-- Darker Purple -->
+    </radialGradient>
+    
+    <!-- Tentacle Gradient -->
+    <linearGradient id="tentacleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#805ad5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6b46c1;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Drop Shadow Filter -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Circle Background -->
+  <circle cx="256" cy="256" r="240" fill="#f7fafc" stroke="#cbd5e0" stroke-width="12"/>
+
+  <!-- Main Group: Friendly Octopus -->
+    <g transform="translate(0, 40)" filter="url(#shadow)"></g>
+    
+    <!-- === REAR TENTACLES (Depth) === -->
+    <path d="M205,315 Q120,440 90,420" fill="none" stroke="#553c9a" stroke-width="28" stroke-linecap="round"/>
+    <path d="M307,315 Q392,440 422,420" fill="none" stroke="#553c9a" stroke-width="28" stroke-linecap="round"/>
+
+    <!-- === BODY SHAPE === -->
+    <!-- Bulbous Head (Squid-like but rounder) -->
+    <ellipse cx="256" cy="220" rx="110" ry="130" fill="url(#bodyGrad)"/>
+    
+    <!-- Body Highlight (Glossy look) -->
+    <ellipse cx="210" cy="180" rx="40" ry="25" fill="#ffffff" opacity="0.15" transform="rotate(-20, 210, 180)"/>
+
+    <!-- === FACE === -->
+    <g transform="translate(0, 10) rotate(8, 256, 220)">
+      <!-- Left Eye -->
+      <circle cx="210" cy="220" r="32" fill="#ffffff" stroke="#4a5568" stroke-width="3"/>
+      <circle cx="225" cy="225" r="10" fill="#2d3748"/> <!-- Pupil (Looking Down-Right) -->
+      <circle cx="229" cy="221" r="3" fill="#ffffff"/> <!-- Shine -->
+
+      <!-- Right Eye -->
+      <circle cx="302" cy="220" r="32" fill="#ffffff" stroke="#4a5568" stroke-width="3"/>
+      <circle cx="317" cy="225" r="10" fill="#2d3748"/> <!-- Pupil (Looking Down-Right) -->
+      <circle cx="321" cy="221" r="3" fill="#ffffff"/> <!-- Shine -->
+      
+      <!-- Cheeks/Blush -->
+      <ellipse cx="170" cy="250" rx="12" ry="8" fill="#feb2b2" opacity="0.5"/>
+      <ellipse cx="342" cy="250" rx="12" ry="8" fill="#feb2b2" opacity="0.5"/>
+    </g>
+
+
+    <!-- === FRONT TENTACLES (Active Arms) === -->
+
+    <!-- CENTER TENTACLES (Just hanging) -->
+    <path d="M220,340 Q210,400 200,380" fill="none" stroke="url(#tentacleGrad)" stroke-width="28" stroke-linecap="round"/>
+    <path d="M292,340 Q302,400 312,380" fill="none" stroke="url(#tentacleGrad)" stroke-width="28" stroke-linecap="round"/>
+    <!-- Suckers on center tentacles -->
+    <circle cx="200" cy="380" r="6" fill="#d6bcfa" opacity="0.6"/>
+    <circle cx="312" cy="380" r="6" fill="#d6bcfa" opacity="0.6"/>
+
+    
+    <!-- RIGHT ARM (Viewer Left) - Holding Coffee -->
+    <!-- Arm Curve -->
+    <path d="M180,300 Q110,320 100,260" fill="none" stroke="url(#tentacleGrad)" stroke-width="28" stroke-linecap="round"/>
+    
+    <!-- Coffee Cup Object -->
+    <g transform="translate(48, 235)">
+       <!-- Steam -->
+       <path d="M15,-15 Q20,-30 15,-45" stroke="#cbd5e0" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.7"/>
+       <path d="M35,-10 Q40,-25 35,-40" stroke="#cbd5e0" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.7"/>
+
+       <!-- Mug Body -->
+       <path d="M5,0 L5,45 Q5,55 15,55 L35,55 Q45,55 45,45 L45,0 Z" fill="#ffffff" stroke="#2d3748" stroke-width="2"/>
+       <!-- Handle -->
+       <path d="M45,10 Q60,10 60,25 Q60,40 45,40" fill="none" stroke="#2d3748" stroke-width="3" stroke-linecap="round"/>
+       <!-- Coffee Surface -->
+       <ellipse cx="25" cy="0" rx="20" ry="5" fill="#744210" stroke="#2d3748" stroke-width="1"/> 
+    </g>
+    <!-- Tentacle Tip (Hand) -->
+    <circle cx="100" cy="260" r="18" fill="#805ad5"/>
+    <circle cx="100" cy="260" r="8" fill="#d6bcfa" opacity="0.8"/> <!-- Sucker -->
+
+
+    <!-- LEFT ARM (Viewer Right) - Holding Newspaper -->
+    <!-- Arm Curve Removed -->
+    <!-- <path d="M280,315 Q310,360 350,330" fill="none" stroke="url(#tentacleGrad)" stroke-width="28" stroke-linecap="round"/> -->
+    
+    <!-- Newspaper Object -->
+    <g transform="translate(340, 260) scale(0.95, 0.7) rotate(15) skewX(-20)">
+       <!-- Front Sheet (Content) -->
+       <rect x="0" y="0" width="85" height="100" fill="#ffffff" stroke="#2d3748" stroke-width="2"/>
+       
+       <!-- Header Block -->
+       <rect x="10" y="10" width="65" height="12" fill="#2d3748" opacity="0.8"/> 
+       
+       <!-- Image Placeholder (Blue) -->
+       <rect x="10" y="30" width="25" height="25" fill="#4299e1" opacity="0.6"/> 
+       
+       <!-- Text Lines -->
+       <line x1="40" y1="35" x2="75" y2="35" stroke="#718096" stroke-width="2"/>
+       <line x1="40" y1="45" x2="75" y2="45" stroke="#718096" stroke-width="2"/>
+       <line x1="40" y1="55" x2="75" y2="55" stroke="#718096" stroke-width="2"/>
+       
+       <line x1="10" y1="70" x2="75" y2="70" stroke="#718096" stroke-width="2"/>
+       <line x1="10" y1="80" x2="75" y2="80" stroke="#718096" stroke-width="2"/>
+       <line x1="10" y1="90" x2="50" y2="90" stroke="#718096" stroke-width="2"/>
+
+       <!-- Back Sheet (Moved to Front) -->
+       <rect x="5" y="5" width="85" height="100" fill="#e2e8f0" stroke="#4a5568" stroke-width="1" opacity="0.5"/>
+    </g>
+
+    <!-- Hand holding the newspaper (Sucker) -->
+    <circle cx="350" cy="337" r="18" fill="#805ad5"/>
+    <circle cx="350" cy="337" r="8" fill="#d6bcfa" opacity="0.6"/>
+</svg>

@@ -1,6 +1,4 @@
-# GitHub Profile Readme Postprocessor
-
-A tool that leverages GitHub's built-in features to automatically update your GitHub profile readme file based on your situation and display needs, making the resume of your open-source journey on GitHub more direct, pure, and clear.
+![github-profile-readme-postprocessor](https://socialify.git.ci/leoweyr/github-profile-readme-postprocessor/image?description=1&font=KoHo&logo=https%3A%2F%2Fraw.githubusercontent.com%2Fleoweyr%2Fgithub-profile-readme-postprocessor%2Frefs%2Fheads%2Fdevelop%2Fassets%2Ficon.svg&name=1&owner=1&pattern=Formal+Invitation&theme=Light)
 
 ## 🏗️ Build
 
@@ -26,6 +24,13 @@ You can use this tool as a GitHub Action to automatically update your profile RE
 > **Template-First**: Always edit your template file. The action overwrites `README.md` with rendered content.
 > **Security**: All `endpoint` values MUST end with `/markdown`.
 > **Permissions**: Ensure `permissions: contents: write` is set.
+
+| Argument | Description | Required |
+| :--- | :--- | :--- |
+| `github_token` | GitHub Token for API access. | **Yes** |
+| `readme_template_path` | Path to the README template file. | No |
+| `tasks` | JSON list of tasks defining anchors, endpoints, and params. | No |
+| `sort_latest_activity_blocks` | Whether to sort `LATEST_ACTIVITY` blocks by timestamp (descending). | No |
 
 1. **Create Template**
 
@@ -60,6 +65,7 @@ You can use this tool as a GitHub Action to automatically update your profile RE
            with:
              github_token: ${{ secrets.GITHUB_TOKEN }}
              readme_template_path: 'README.template.md'  # Your template file.
+             sort_latest_activity_blocks: true
              tasks: |
                [
                  {

@@ -88,6 +88,57 @@ get:
         default: "### 📦 Project"
       description: The custom title for the markdown section.
 
+    - in: query
+      name: show_recent_activity_stats
+      schema:
+        type: integer
+      description: "The duration in hours to display activity statistics next to the repository name. If 0 or omitted, stats are hidden. (Special labels: 24h -> Day, 168h -> Week, 720h -> Month, 8760h -> Year)"
+
+    - in: query
+      name: adaptive_show_recent_activity_stats
+      schema:
+        type: boolean
+        default: false
+      description: |
+        If true, adaptively determines the best time window for showing activity stats.
+        
+        Logic:
+        1. Starts checking from the window defined by `show_recent_activity_stats` (or defaults to 24h if 0/unset).
+        2. Checks windows in this order: Day (24h) -> Week (168h) -> Month (720h) -> Year (8760h).
+        3. If no activity is found in the current window, it expands to the next larger window.
+        4. If activity is found, it displays stats for that window.
+        5. If no activity is found even in the Year window, it falls back to showing all stats since the beginning of the query period (labeled "Past Stats").
+
+    - in: query
+      name: show_latest_activity
+      schema:
+        type: boolean
+        default: false
+      description: |
+        If true, displays the latest activity (Commit, Issue, or Pull Request) for the repository.
+        
+        Format:
+        📌 **Latest:** [Message/Title](url) (TimeAgo)
+        
+        Emoji Logic:
+        - **Commit**: 📌 (Default). If Conventional Commits:
+          - feat: ✨
+          - fix: 🐛
+          - docs: 📝
+          - refactor: ♻️
+          - perf: ⏫
+          - test: 🧪
+          - style: 💄
+          - chore: 🧹
+          - ci: 🤖
+          - revert: ⏪
+        
+        - **Issue**:
+          - Created: ⚠️
+          - Commented: 💬
+        
+        - **Pull Request**: 🔀
+
   responses:
     '200':
       description: A Markdown formatted list of repositories.
@@ -96,6 +147,11 @@ get:
           schema:
             type: string
             example: |
+              <!-- LATEST_ACTIVITY: 2024-03-13T14:30:00Z -->
               ### 📦 Product
 
               - **[github-profile-readme-postprocessor](https://github.com/leoweyr/github-profile-readme-postprocessor)** `Owned` — A tool that leverages GitHub's built-in features to automatically update your GitHub profile readme file based on your situation and display needs, making the resume of your open-source journey on GitHub more direct, pure, and clear.
+                
+                📈 **Past Stats:** 66 Commits
+              
+              <!-- LATEST_ACTIVITY_END -->
