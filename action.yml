@@ -2,6 +2,10 @@ name: 'GitHub Profile Readme Postprocessor Action'
 description: 'Automatically update your GitHub profile README with your recent activity and repository insights using a local Go server.'
 author: 'leoweyr'
 
+branding:
+  icon: 'layout'
+  color: 'blue'
+
 inputs:
   readme_template_path:
     description: 'Path to the README template file.'
