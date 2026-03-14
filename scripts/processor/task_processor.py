@@ -30,6 +30,11 @@ class TaskProcessor:
             if 'username' not in parameters:
                 parameters['username'] = self.username
 
+            # Fix boolean parameter casing: Python uses True/False, but Go expects "true"/"false".
+            for key, value in parameters.items():
+                if isinstance(value, bool):
+                    parameters[key] = str(value).lower()
+
             request_url: str = f"{self.base_url}{endpoint}"
             print(f"Processing anchor '{anchor}' -> {request_url} with parameters {parameters}.")
 
@@ -37,6 +42,8 @@ class TaskProcessor:
                 response: requests.Response = requests.get(request_url, params=parameters)
                 response.raise_for_status()
                 fetched_content: str = response.text
+                
+                print(f"DEBUG: Fetched from {response.url}:\n--- BEGIN CONTENT ---\n{fetched_content}\n--- END CONTENT ---")
 
                 updated, _ = updater.update_section(anchor, fetched_content)
 
