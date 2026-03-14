@@ -38,7 +38,7 @@ class TaskProcessor:
                 response.raise_for_status()
                 fetched_content: str = response.text
                 
-                print(f"DEBUG: Fetched content for {anchor}:\n--- BEGIN CONTENT ---\n{fetched_content}\n--- END CONTENT ---")
+                print(f"DEBUG: Fetched from {response.url}:\n--- BEGIN CONTENT ---\n{fetched_content}\n--- END CONTENT ---")
 
                 updated, _ = updater.update_section(anchor, fetched_content)
 
