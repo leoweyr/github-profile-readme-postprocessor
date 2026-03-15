@@ -12,5 +12,7 @@ type Repository struct {
 	HTMLURL     string
 	Owner       string
 	Topics      []string
+	Private     bool
 	StarredAt   time.Time
+	PushedAt    time.Time
 }

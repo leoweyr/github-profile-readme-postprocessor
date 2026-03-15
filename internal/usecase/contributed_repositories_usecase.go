@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -46,6 +47,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 	includePullRequests bool,
 	recentActivityStatsHours int,
 	adaptiveRecentActivityStats bool,
+	includePrivate bool,
 ) ([]*domain.ContributedRepository, error) {
 	// Map to track unique repositories and their latest activity time.
 	// Key: "owner/repository".
@@ -60,6 +62,19 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 	if statsWindowHours <= 0 {
 		statsWindowHours = 24 // Default to 24h if not specified.
+	}
+
+	// 0. Pre-fetch private repositories if needed.
+	// This avoids multiple calls to FetchPrivateRepositories across commits, PRs, and issues logic.
+	var privateRepos []*domain.Repository
+	var fetchPrivateErr error
+	privateRepos, fetchPrivateErr = useCase.repositoryFetcher.FetchPrivateRepositories(context)
+
+	if fetchPrivateErr != nil {
+		fmt.Printf("Warning: Failed to fetch private repositories: %v\n", fetchPrivateErr)
+		// Continue execution, privateRepos will be nil/empty so loops will just skip.
+	} else {
+		// fmt.Printf("DEBUG: Pre-fetched %d private repositories\n", len(privateRepos))
 	}
 
 	// Fetch all activities first to support adaptive windows.
@@ -101,6 +116,48 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				}
 			}
 		}
+
+		// 1.1 Fetch Private Commits if requested and username matches.
+		if includePrivate && len(privateRepos) > 0 {
+			var privateCommits []*domain.Commit
+			var fetchPrivateCommitsErr error
+			privateCommits, fetchPrivateCommitsErr = useCase.commitFetcher.FetchPrivateCommits(context, username, privateRepos, startTime, endTime)
+
+			if fetchPrivateCommitsErr != nil {
+				fmt.Printf("Failed to fetch private commits: %v\n", fetchPrivateCommitsErr)
+			} else {
+				// Merge private commits.
+				var privateCommit *domain.Commit
+
+				for _, privateCommit = range privateCommits {
+					if privateCommit.RepositoryName == "" {
+						continue
+					}
+
+					// Add to allCommits list for stats calculation later.
+					allCommits = append(allCommits, privateCommit)
+
+					var currentLatest time.Time = repositoryActivityMap[privateCommit.RepositoryName]
+
+					if privateCommit.CommittedAt.After(currentLatest) {
+						repositoryActivityMap[privateCommit.RepositoryName] = privateCommit.CommittedAt
+
+						var title string = privateCommit.Message
+
+						if index := strings.Index(title, "\n"); index != -1 {
+							title = title[:index]
+						}
+
+						repositoryLatestActivityMap[privateCommit.RepositoryName] = &domain.ActivityItem{
+							Type:      domain.ActivityTypeCommit,
+							Title:     title,
+							URL:       privateCommit.HTMLURL,
+							CreatedAt: privateCommit.CommittedAt,
+						}
+					}
+				}
+			}
+		}
 	}
 
 	// 2. Fetch Pull Requests if requested.
@@ -115,11 +172,13 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		}
 
 		var pullRequest *domain.PullRequest
+		var currentLatest time.Time
+		var repositoryName string
 
 		for _, pullRequest = range allPullRequests {
 			// Parsing repository name from URL or field.
 			// The fetcher should populate RepositoryName.
-			var repositoryName string = pullRequest.RepositoryName
+			repositoryName = pullRequest.RepositoryName
 
 			// If repository name is a URL, extract the full name.
 			// E.g., https://api.github.com/repos/owner/repo.
@@ -131,7 +190,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				continue
 			}
 
-			var currentLatest time.Time = repositoryActivityMap[repositoryName]
+			currentLatest = repositoryActivityMap[repositoryName]
 
 			if pullRequest.CreatedAt.After(currentLatest) {
 				repositoryActivityMap[repositoryName] = pullRequest.CreatedAt
@@ -140,6 +199,37 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 					Title:     pullRequest.Title,
 					URL:       pullRequest.HTMLURL,
 					CreatedAt: pullRequest.CreatedAt,
+				}
+			}
+		}
+
+		if includePrivate && len(privateRepos) > 0 {
+			var privatePRs []*domain.PullRequest
+			var fetchPRErr error
+			privatePRs, fetchPRErr = useCase.pullRequestFetcher.FetchPrivatePullRequests(context, username, privateRepos, startTime, endTime)
+
+			if fetchPRErr == nil {
+				// Merge and process.
+				allPullRequests = append(allPullRequests, privatePRs...)
+
+				for _, pullRequest = range privatePRs {
+					repositoryName = pullRequest.RepositoryName
+
+					if repositoryName == "" {
+						continue
+					}
+
+					currentLatest = repositoryActivityMap[repositoryName]
+
+					if pullRequest.CreatedAt.After(currentLatest) {
+						repositoryActivityMap[repositoryName] = pullRequest.CreatedAt
+						repositoryLatestActivityMap[repositoryName] = &domain.ActivityItem{
+							Type:      domain.ActivityTypePullRequest,
+							Title:     pullRequest.Title,
+							URL:       pullRequest.HTMLURL,
+							CreatedAt: pullRequest.CreatedAt,
+						}
+					}
 				}
 			}
 		}
@@ -157,9 +247,11 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		}
 
 		var issue *domain.Issue
+		var currentLatest time.Time
+		var repositoryName string
 
 		for _, issue = range allIssues {
-			var repositoryName string = issue.RepositoryName
+			repositoryName = issue.RepositoryName
 
 			if strings.HasPrefix(repositoryName, "https://api.github.com/repos/") {
 				repositoryName = strings.TrimPrefix(repositoryName, "https://api.github.com/repos/")
@@ -169,7 +261,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				continue
 			}
 
-			var currentLatest time.Time = repositoryActivityMap[repositoryName]
+			currentLatest = repositoryActivityMap[repositoryName]
 
 			if issue.CreatedAt.After(currentLatest) {
 				repositoryActivityMap[repositoryName] = issue.CreatedAt
@@ -179,6 +271,37 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 					URL:         issue.HTMLURL,
 					CreatedAt:   issue.CreatedAt,
 					IssueAction: issue.Action,
+				}
+			}
+		}
+
+		if includePrivate && len(privateRepos) > 0 {
+			var privateIssues []*domain.Issue
+			var fetchIssueErr error
+			privateIssues, fetchIssueErr = useCase.issueFetcher.FetchPrivateIssueActivities(context, username, privateRepos, startTime, endTime)
+
+			if fetchIssueErr == nil {
+				allIssues = append(allIssues, privateIssues...)
+
+				for _, issue = range privateIssues {
+					repositoryName = issue.RepositoryName
+
+					if repositoryName == "" {
+						continue
+					}
+
+					currentLatest = repositoryActivityMap[repositoryName]
+
+					if issue.CreatedAt.After(currentLatest) {
+						repositoryActivityMap[repositoryName] = issue.CreatedAt
+						repositoryLatestActivityMap[repositoryName] = &domain.ActivityItem{
+							Type:        domain.ActivityTypeIssue,
+							Title:       issue.Title,
+							URL:         issue.HTMLURL,
+							CreatedAt:   issue.CreatedAt,
+							IssueAction: issue.Action,
+						}
+					}
 				}
 			}
 		}
@@ -321,7 +444,12 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 		if fetchError != nil {
 			// If fetching details fails, we might skip this repo or log error.
+			fmt.Printf("Failed to fetch repository details for %s/%s: %v\n", owner, repositoryName, fetchError)
 			// For robustness, skip.
+			continue
+		}
+
+		if !includePrivate && repositoryDetails.Private {
 			continue
 		}
 

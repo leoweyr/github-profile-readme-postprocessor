@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/v69/github"
@@ -97,4 +98,72 @@ func (fetcher *CommitFetcher) FetchCommits(context context.Context, username str
 	}
 
 	return allCommits, nil
+}
+
+// FetchPrivateCommits retrieves commits from specified private repositories for the user.
+func (fetcher *CommitFetcher) FetchPrivateCommits(context context.Context, username string, privateRepos []*domain.Repository, startTime, endTime time.Time) ([]*domain.Commit, error) {
+	var allPrivateCommits []*domain.Commit
+	var repository *domain.Repository
+
+	for _, repository = range privateRepos {
+		// Optimization: Skip repositories that haven't been pushed to since the start time.
+		if !repository.PushedAt.IsZero() && repository.PushedAt.Before(startTime) {
+			continue
+		}
+
+		// Configure list options per repository.
+		var currentRepoOptions *github.CommitsListOptions = &github.CommitsListOptions{
+			Author: username, // Strict filtering by author as requested.
+			Since:  startTime,
+			Until:  endTime,
+			ListOptions: github.ListOptions{
+				PerPage: 20,
+			},
+		}
+
+		// Parse owner/repo.
+		var parts []string = strings.Split(repository.FullName, "/")
+
+		if len(parts) != 2 {
+			continue
+		}
+
+		var owner string = parts[0]
+		var repositoryName string = parts[1]
+
+		var commits []*github.RepositoryCommit
+		var listError error
+		commits, _, listError = fetcher.client.Repositories.ListCommits(context, owner, repositoryName, currentRepoOptions)
+
+		if listError != nil {
+			// Log error but continue to next repo.
+			fmt.Printf("DEBUG: Failed to list commits for private repo %s: %v\n", repository.FullName, listError)
+			continue
+		}
+
+		var item *github.RepositoryCommit
+
+		for _, item = range commits {
+			if item.Commit == nil {
+				continue
+			}
+
+			var committedAt time.Time
+
+			if item.Commit.Committer.Date != nil {
+				committedAt = item.Commit.Committer.Date.Time
+			}
+
+			var commit *domain.Commit = &domain.Commit{
+				SHA:            item.GetSHA(),
+				Message:        item.Commit.GetMessage(),
+				RepositoryName: repository.FullName,
+				HTMLURL:        item.GetHTMLURL(),
+				CommittedAt:    committedAt,
+			}
+
+			allPrivateCommits = append(allPrivateCommits, commit)
+		}
+	}
+	return allPrivateCommits, nil
 }

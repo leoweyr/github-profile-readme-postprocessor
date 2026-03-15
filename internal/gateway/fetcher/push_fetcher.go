@@ -112,7 +112,7 @@ func (fetcher *PushFetcher) FetchPushes(context context.Context, username string
 }
 
 // countCommits returns the number of commits by the user in the repository within the time range.
-func (fetcher *PushFetcher) countCommits(context context.Context, username, repositoryName string, startTime, endTime time.Time) (int, error) {
+func (fetcher *PushFetcher) countCommits(context context.Context, username string, repositoryName string, startTime, endTime time.Time) (int, error) {
 	var commitsListOptions *github.CommitsListOptions = &github.CommitsListOptions{
 		Author: username,
 		Since:  startTime,

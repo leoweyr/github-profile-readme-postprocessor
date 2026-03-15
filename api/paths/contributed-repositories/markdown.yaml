@@ -16,6 +16,20 @@ get:
     # Filtering options.
 
     - in: query
+      name: include_private
+      schema:
+        type: boolean
+        default: false
+      description: |
+        Indicates whether to include private repositories. 
+
+        If true:
+        - Private repositories are included but anonymized (e.g., "my-project" -> "Project: MP").
+        - Marked with a `Private` tag.
+        - Activity stats are shown.
+        - Latest Activity details are hidden.
+
+    - in: query
       name: limit_count
       schema:
         type: integer

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/v69/github"
@@ -113,4 +114,73 @@ func (fetcher *PullRequestFetcher) FetchPullRequests(context context.Context, us
 	}
 
 	return allPullRequests, nil
+}
+
+// FetchPrivatePullRequests retrieves pull requests for private repositories.
+func (fetcher *PullRequestFetcher) FetchPrivatePullRequests(ctx context.Context, username string, privateRepos []*domain.Repository, startTime, endTime time.Time) ([]*domain.PullRequest, error) {
+	var allPrivatePullRequests []*domain.PullRequest
+
+	for _, repository := range privateRepos {
+		// Optimization: Skip repositories that haven't been pushed to since the start time.
+		if !repository.PushedAt.IsZero() && repository.PushedAt.Before(startTime) {
+			continue
+		}
+
+		var parts []string = strings.Split(repository.FullName, "/")
+
+		if len(parts) != 2 {
+			continue
+		}
+
+		var owner string = parts[0]
+		var repositoryName string = parts[1]
+
+		var listOptions *github.IssueListByRepoOptions = &github.IssueListByRepoOptions{
+			Creator: username,
+			Since:   startTime,
+			State:   "all",
+			ListOptions: github.ListOptions{
+				PerPage: 20,
+			},
+		}
+
+		var issues []*github.Issue
+		var listError error
+		issues, _, listError = fetcher.client.Issues.ListByRepo(ctx, owner, repositoryName, listOptions)
+
+		if listError != nil {
+			fmt.Printf("Warning: failed to list PRs for private repo %s: %v\n", repository.FullName, listError)
+			continue
+		}
+
+		var issue *github.Issue
+
+		for _, issue = range issues {
+			if !issue.IsPullRequest() {
+				continue
+			}
+
+			if issue.GetCreatedAt().Before(startTime) || issue.GetCreatedAt().After(endTime) {
+				continue
+			}
+
+			var pullRequest *domain.PullRequest = &domain.PullRequest{
+				Number:         issue.GetNumber(),
+				Title:          issue.GetTitle(),
+				RepositoryName: repository.FullName,
+				HTMLURL:        issue.GetHTMLURL(),
+				State:          issue.GetState(),
+				CreatedAt:      issue.GetCreatedAt().Time,
+			}
+
+			if !issue.GetClosedAt().IsZero() {
+				var closedAt time.Time = issue.GetClosedAt().Time
+				pullRequest.ClosedAt = &closedAt
+			}
+
+			allPrivatePullRequests = append(allPrivatePullRequests, pullRequest)
+		}
+	}
+
+	return allPrivatePullRequests, nil
 }

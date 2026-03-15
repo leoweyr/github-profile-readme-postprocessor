@@ -61,6 +61,70 @@ func (fetcher *IssueActivityFetcher) FetchIssueActivities(context context.Contex
 	return allActivities, nil
 }
 
+// FetchPrivateIssueActivities retrieves issue activities for private repositories.
+func (fetcher *IssueActivityFetcher) FetchPrivateIssueActivities(ctx context.Context, username string, privateRepos []*domain.Repository, startTime, endTime time.Time) ([]*domain.Issue, error) {
+	var allPrivateIssues []*domain.Issue
+
+	for _, repository := range privateRepos {
+		// Optimization: Skip repositories that haven't been pushed to since the start time.
+		if !repository.PushedAt.IsZero() && repository.PushedAt.Before(startTime) {
+			continue
+		}
+
+		var parts []string = strings.Split(repository.FullName, "/")
+
+		if len(parts) != 2 {
+			continue
+		}
+
+		var owner string = parts[0]
+		var repositoryName string = parts[1]
+
+		var listOptions *github.IssueListByRepoOptions = &github.IssueListByRepoOptions{
+			Creator: username,
+			Since:   startTime,
+			State:   "all",
+			ListOptions: github.ListOptions{
+				PerPage: 20,
+			},
+		}
+
+		var issues []*github.Issue
+		var listError error
+		issues, _, listError = fetcher.client.Issues.ListByRepo(ctx, owner, repositoryName, listOptions)
+
+		if listError != nil {
+			fmt.Printf("Warning: failed to list issues for private repo %s: %v\n", repository.FullName, listError)
+			continue
+		}
+
+		var issue *github.Issue
+
+		for _, issue = range issues {
+			if issue.IsPullRequest() {
+				continue // handled by PullRequestFetcher.
+			}
+
+			if issue.GetCreatedAt().Before(startTime) || issue.GetCreatedAt().After(endTime) {
+				continue
+			}
+
+			var activity *domain.Issue = &domain.Issue{
+				Title:          issue.GetTitle(),
+				HTMLURL:        issue.GetHTMLURL(),
+				RepositoryName: repository.FullName,
+				CreatedAt:      issue.GetCreatedAt().Time,
+				Number:         issue.GetNumber(),
+				Action:         enums.IssueActionCreated,
+			}
+
+			allPrivateIssues = append(allPrivateIssues, activity)
+		}
+	}
+
+	return allPrivateIssues, nil
+}
+
 func (fetcher *IssueActivityFetcher) fetchCreatedIssues(context context.Context, username string, startTime, endTime time.Time) ([]*domain.Issue, error) {
 	var activities []*domain.Issue
 	var searchOptions *github.SearchOptions = &github.SearchOptions{

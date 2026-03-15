@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/go-github/v69/github"
 	"golang.org/x/oauth2"
@@ -57,10 +58,65 @@ func (fetcher *RepositoryFetcher) FetchRepository(context context.Context, owner
 		HTMLURL:     repository.GetHTMLURL(),
 		Owner:       repository.GetOwner().GetLogin(),
 		Topics:      topics,
+		Private:     repository.GetPrivate(),
 	}
 
 	// Rate limit check could be added here if needed using response.
 	_ = response
 
 	return domainRepository, nil
+}
+
+// FetchPrivateRepositories retrieves a list of private repositories for the authenticated user.
+func (fetcher *RepositoryFetcher) FetchPrivateRepositories(context context.Context) ([]*domain.Repository, error) {
+	var allPrivateRepos []*domain.Repository
+	var listOptions *github.RepositoryListOptions = &github.RepositoryListOptions{
+		Visibility:  "private",
+		Affiliation: "owner,collaborator,organization_member",
+		Sort:        "pushed",
+		Direction:   "desc",
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	for {
+		var repositories []*github.Repository
+		var response *github.Response
+		var listError error
+		repositories, response, listError = fetcher.client.Repositories.List(context, "", listOptions)
+
+		if listError != nil {
+			return nil, fmt.Errorf("failed to list private repositories: %w", listError)
+		}
+
+		var repository *github.Repository
+
+		for _, repository = range repositories {
+			var pushedAt time.Time
+
+			if repository.PushedAt != nil {
+				pushedAt = repository.PushedAt.Time
+			}
+
+			var domainRepository *domain.Repository = &domain.Repository{
+				Name:        repository.GetName(),
+				FullName:    repository.GetFullName(),
+				Description: repository.GetDescription(),
+				HTMLURL:     repository.GetHTMLURL(),
+				Owner:       repository.GetOwner().GetLogin(),
+				Topics:      repository.Topics,
+				Private:     true,
+				PushedAt:    pushedAt,
+			}
+
+			allPrivateRepos = append(allPrivateRepos, domainRepository)
+		}
+
+		if response.NextPage == 0 {
+			break
+		}
+
+		listOptions.Page = response.NextPage
+	}
+
+	return allPrivateRepos, nil
 }
