@@ -72,7 +72,7 @@ func (fetcher *RepositoryFetcher) FetchPrivateRepositories(context context.Conte
 	var allPrivateRepos []*domain.Repository
 	var listOptions *github.RepositoryListOptions = &github.RepositoryListOptions{
 		Visibility:  "private",
-		Affiliation: "owner,collaborator,organization_member",
+		Affiliation: "owner,collaborator,organization_member", // Include repos where user is owner, collaborator, or org member.
 		Sort:        "pushed",
 		Direction:   "desc",
 		ListOptions: github.ListOptions{PerPage: 100},

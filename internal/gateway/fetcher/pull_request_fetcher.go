@@ -184,3 +184,75 @@ func (fetcher *PullRequestFetcher) FetchPrivatePullRequests(ctx context.Context,
 
 	return allPrivatePullRequests, nil
 }
+
+// GetLatestPrivatePullRequest fetches the single most recent PR for a repo.
+func (fetcher *PullRequestFetcher) GetLatestPrivatePullRequest(ctx context.Context, username string, repo *domain.Repository) (*domain.PullRequest, error) {
+	var parts []string = strings.Split(repo.FullName, "/")
+
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid repo name: %s", repo.FullName)
+	}
+
+	var owner string = parts[0]
+	var repositoryName string = parts[1]
+
+	var listOptions *github.PullRequestListOptions = &github.PullRequestListOptions{
+		State:       "all",
+		Sort:        "created",
+		Direction:   "desc",
+		ListOptions: github.ListOptions{PerPage: 1},
+	}
+
+	var prs []*github.PullRequest
+	var listError error
+
+	prs, _, listError = fetcher.client.PullRequests.List(ctx, owner, repositoryName, listOptions)
+
+	if listError != nil {
+		return nil, listError
+	}
+
+	for _, pr := range prs {
+		if pr.User != nil && pr.User.Login != nil && *pr.User.Login == username {
+			var createdAt time.Time = pr.GetCreatedAt().Time
+			var pullRequest *domain.PullRequest = &domain.PullRequest{
+				Number:         pr.GetNumber(),
+				Title:          pr.GetTitle(),
+				RepositoryName: repo.FullName,
+				HTMLURL:        pr.GetHTMLURL(),
+				State:          pr.GetState(),
+				CreatedAt:      createdAt,
+			}
+
+			return pullRequest, nil
+		}
+	}
+
+	return nil, nil
+}
+
+// CountPrivatePullRequests counts PRs in a private repo within a time window.
+func (fetcher *PullRequestFetcher) CountPrivatePullRequests(ctx context.Context, username string, repo *domain.Repository, since, until time.Time) (int, error) {
+	// Use Search API for precise counting.
+	var query string = fmt.Sprintf("repo:%s type:pr author:%s created:%s..%s", repo.FullName, username, since.Format("2006-01-02"), until.Format("2006-01-02"))
+	var searchOptions *github.SearchOptions = &github.SearchOptions{
+		ListOptions: github.ListOptions{PerPage: 1},
+	}
+
+	var result *github.IssuesSearchResult
+	var response *github.Response
+	var searchError error
+	result, response, searchError = fetcher.client.Search.Issues(ctx, query, searchOptions)
+
+	if searchError != nil {
+		return 0, searchError
+	}
+
+	if result.Total == nil {
+		return 0, nil
+	}
+
+	_ = response // Unused.
+
+	return *result.Total, nil
+}

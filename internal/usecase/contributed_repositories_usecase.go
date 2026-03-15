@@ -49,37 +49,29 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 	adaptiveRecentActivityStats bool,
 	includePrivate bool,
 ) ([]*domain.ContributedRepository, error) {
+	// Optimization Strategy (Ladder Algorithm):
+	// 1. Discovery Phase: Collect all active repository candidates.
+	//    - Public: Fetch active repos via Search API (efficient).
+	//    - Private: Fetch all private repos and use PushedAt as initial sorting key (avoids deep fetching).
+	// 2. Ranking Phase: Sort candidates by activity time and slice the Top N (limitCount).
+	// 3. Hydration Phase: For only the Top N repositories:
+	//    - Fetch precise "Latest Activity" details (Commit/PR/Issue) if missing (Private).
+	//    - Calculate activity stats using adaptive time windows (Ladder) to minimize API calls.
+
+	// --- Phase 1: Candidate Discovery ---
+
 	// Map to track unique repositories and their latest activity time.
 	// Key: "owner/repository".
 	var repositoryActivityMap map[string]time.Time = make(map[string]time.Time)
 	var repositoryLatestActivityMap map[string]*domain.ActivityItem = make(map[string]*domain.ActivityItem)
+	// Track strict ownership for later stats hydration.
+	var repositoryIsPrivateMap map[string]*domain.Repository = make(map[string]*domain.Repository)
 
-	// Map to track activity stats for each repository.
-	var repositoryStatsMap map[string]*domain.ActivityStats = make(map[string]*domain.ActivityStats)
-
-	// Determine initial time window for stats.
-	var statsWindowHours int = recentActivityStatsHours
-
-	if statsWindowHours <= 0 {
-		statsWindowHours = 24 // Default to 24h if not specified.
-	}
-
-	// 0. Pre-fetch private repositories if needed.
-	// This avoids multiple calls to FetchPrivateRepositories across commits, PRs, and issues logic.
-	var privateRepos []*domain.Repository
-	var fetchPrivateErr error
-	privateRepos, fetchPrivateErr = useCase.repositoryFetcher.FetchPrivateRepositories(context)
-
-	if fetchPrivateErr != nil {
-		fmt.Printf("Warning: Failed to fetch private repositories: %v\n", fetchPrivateErr)
-		// Continue execution, privateRepos will be nil/empty so loops will just skip.
-	} else {
-		// fmt.Printf("DEBUG: Pre-fetched %d private repositories\n", len(privateRepos))
-	}
-
-	// Fetch all activities first to support adaptive windows.
-	// 1. Fetch Commits if requested.
+	// 1.1 Public Activity Discovery (using Search API).
+	// We keep existing logic for public data as Search is relatively efficient.
 	var allCommits []*domain.Commit
+	var allPullRequests []*domain.PullRequest
+	var allIssues []*domain.Issue
 
 	if includeCommits {
 		var commitError error
@@ -88,10 +80,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		if commitError != nil {
 			return nil, commitError
 		}
-
-		var commit *domain.Commit
-
-		for _, commit = range allCommits {
+		for _, commit := range allCommits {
 			if commit.RepositoryName == "" {
 				continue
 			}
@@ -100,8 +89,6 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 			if commit.CommittedAt.After(currentLatest) {
 				repositoryActivityMap[commit.RepositoryName] = commit.CommittedAt
-
-				// Only use the first line of the commit message for the title.
 				var title string = commit.Message
 
 				if index := strings.Index(title, "\n"); index != -1 {
@@ -116,52 +103,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				}
 			}
 		}
-
-		// 1.1 Fetch Private Commits if requested and username matches.
-		if includePrivate && len(privateRepos) > 0 {
-			var privateCommits []*domain.Commit
-			var fetchPrivateCommitsErr error
-			privateCommits, fetchPrivateCommitsErr = useCase.commitFetcher.FetchPrivateCommits(context, username, privateRepos, startTime, endTime)
-
-			if fetchPrivateCommitsErr != nil {
-				fmt.Printf("Failed to fetch private commits: %v\n", fetchPrivateCommitsErr)
-			} else {
-				// Merge private commits.
-				var privateCommit *domain.Commit
-
-				for _, privateCommit = range privateCommits {
-					if privateCommit.RepositoryName == "" {
-						continue
-					}
-
-					// Add to allCommits list for stats calculation later.
-					allCommits = append(allCommits, privateCommit)
-
-					var currentLatest time.Time = repositoryActivityMap[privateCommit.RepositoryName]
-
-					if privateCommit.CommittedAt.After(currentLatest) {
-						repositoryActivityMap[privateCommit.RepositoryName] = privateCommit.CommittedAt
-
-						var title string = privateCommit.Message
-
-						if index := strings.Index(title, "\n"); index != -1 {
-							title = title[:index]
-						}
-
-						repositoryLatestActivityMap[privateCommit.RepositoryName] = &domain.ActivityItem{
-							Type:      domain.ActivityTypeCommit,
-							Title:     title,
-							URL:       privateCommit.HTMLURL,
-							CreatedAt: privateCommit.CommittedAt,
-						}
-					}
-				}
-			}
-		}
 	}
-
-	// 2. Fetch Pull Requests if requested.
-	var allPullRequests []*domain.PullRequest
 
 	if includePullRequests {
 		var pullRequestError error
@@ -170,31 +112,18 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		if pullRequestError != nil {
 			return nil, pullRequestError
 		}
-
-		var pullRequest *domain.PullRequest
-		var currentLatest time.Time
-		var repositoryName string
-
-		for _, pullRequest = range allPullRequests {
-			// Parsing repository name from URL or field.
-			// The fetcher should populate RepositoryName.
-			repositoryName = pullRequest.RepositoryName
-
-			// If repository name is a URL, extract the full name.
-			// E.g., https://api.github.com/repos/owner/repo.
-			if strings.HasPrefix(repositoryName, "https://api.github.com/repos/") {
-				repositoryName = strings.TrimPrefix(repositoryName, "https://api.github.com/repos/")
+		for _, pullRequest := range allPullRequests {
+			var repoName string = pullRequest.RepositoryName
+			if strings.HasPrefix(repoName, "https://api.github.com/repos/") {
+				repoName = strings.TrimPrefix(repoName, "https://api.github.com/repos/")
 			}
-
-			if repositoryName == "" {
+			if repoName == "" {
 				continue
 			}
-
-			currentLatest = repositoryActivityMap[repositoryName]
-
+			var currentLatest time.Time = repositoryActivityMap[repoName]
 			if pullRequest.CreatedAt.After(currentLatest) {
-				repositoryActivityMap[repositoryName] = pullRequest.CreatedAt
-				repositoryLatestActivityMap[repositoryName] = &domain.ActivityItem{
+				repositoryActivityMap[repoName] = pullRequest.CreatedAt
+				repositoryLatestActivityMap[repoName] = &domain.ActivityItem{
 					Type:      domain.ActivityTypePullRequest,
 					Title:     pullRequest.Title,
 					URL:       pullRequest.HTMLURL,
@@ -202,41 +131,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				}
 			}
 		}
-
-		if includePrivate && len(privateRepos) > 0 {
-			var privatePRs []*domain.PullRequest
-			var fetchPRErr error
-			privatePRs, fetchPRErr = useCase.pullRequestFetcher.FetchPrivatePullRequests(context, username, privateRepos, startTime, endTime)
-
-			if fetchPRErr == nil {
-				// Merge and process.
-				allPullRequests = append(allPullRequests, privatePRs...)
-
-				for _, pullRequest = range privatePRs {
-					repositoryName = pullRequest.RepositoryName
-
-					if repositoryName == "" {
-						continue
-					}
-
-					currentLatest = repositoryActivityMap[repositoryName]
-
-					if pullRequest.CreatedAt.After(currentLatest) {
-						repositoryActivityMap[repositoryName] = pullRequest.CreatedAt
-						repositoryLatestActivityMap[repositoryName] = &domain.ActivityItem{
-							Type:      domain.ActivityTypePullRequest,
-							Title:     pullRequest.Title,
-							URL:       pullRequest.HTMLURL,
-							CreatedAt: pullRequest.CreatedAt,
-						}
-					}
-				}
-			}
-		}
 	}
-
-	// 3. Fetch Issues if requested.
-	var allIssues []*domain.Issue
 
 	if includeIssues {
 		var issueError error
@@ -245,27 +140,22 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		if issueError != nil {
 			return nil, issueError
 		}
+		for _, issue := range allIssues {
+			var repoName string = issue.RepositoryName
 
-		var issue *domain.Issue
-		var currentLatest time.Time
-		var repositoryName string
-
-		for _, issue = range allIssues {
-			repositoryName = issue.RepositoryName
-
-			if strings.HasPrefix(repositoryName, "https://api.github.com/repos/") {
-				repositoryName = strings.TrimPrefix(repositoryName, "https://api.github.com/repos/")
+			if strings.HasPrefix(repoName, "https://api.github.com/repos/") {
+				repoName = strings.TrimPrefix(repoName, "https://api.github.com/repos/")
 			}
 
-			if repositoryName == "" {
+			if repoName == "" {
 				continue
 			}
 
-			currentLatest = repositoryActivityMap[repositoryName]
+			var currentLatest time.Time = repositoryActivityMap[repoName]
 
 			if issue.CreatedAt.After(currentLatest) {
-				repositoryActivityMap[repositoryName] = issue.CreatedAt
-				repositoryLatestActivityMap[repositoryName] = &domain.ActivityItem{
+				repositoryActivityMap[repoName] = issue.CreatedAt
+				repositoryLatestActivityMap[repoName] = &domain.ActivityItem{
 					Type:        domain.ActivityTypeIssue,
 					Title:       issue.Title,
 					URL:         issue.HTMLURL,
@@ -274,155 +164,83 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				}
 			}
 		}
+	}
 
-		if includePrivate && len(privateRepos) > 0 {
-			var privateIssues []*domain.Issue
-			var fetchIssueErr error
-			privateIssues, fetchIssueErr = useCase.issueFetcher.FetchPrivateIssueActivities(context, username, privateRepos, startTime, endTime)
+	// 1.2 Private Activity Discovery (Optimized).
+	if includePrivate {
+		var privateRepos []*domain.Repository
+		var fetchPrivateErr error
+		privateRepos, fetchPrivateErr = useCase.repositoryFetcher.FetchPrivateRepositories(context)
 
-			if fetchIssueErr == nil {
-				allIssues = append(allIssues, privateIssues...)
+		if fetchPrivateErr != nil {
+			fmt.Printf("Warning: Failed to fetch private repositories: %v\n", fetchPrivateErr)
+		} else {
+			for _, repo := range privateRepos {
+				// Use PushedAt as a lightweight proxy for "Latest Activity".
+				// This avoids fetching commits/issues for every private repo.
+				if !repo.PushedAt.IsZero() && !repo.PushedAt.Before(startTime) {
+					var currentLatest time.Time = repositoryActivityMap[repo.FullName]
 
-				for _, issue = range privateIssues {
-					repositoryName = issue.RepositoryName
-
-					if repositoryName == "" {
-						continue
-					}
-
-					currentLatest = repositoryActivityMap[repositoryName]
-
-					if issue.CreatedAt.After(currentLatest) {
-						repositoryActivityMap[repositoryName] = issue.CreatedAt
-						repositoryLatestActivityMap[repositoryName] = &domain.ActivityItem{
-							Type:        domain.ActivityTypeIssue,
-							Title:       issue.Title,
-							URL:         issue.HTMLURL,
-							CreatedAt:   issue.CreatedAt,
-							IssueAction: issue.Action,
-						}
+					if repo.PushedAt.After(currentLatest) {
+						repositoryActivityMap[repo.FullName] = repo.PushedAt
+						// Mark as private so we know to fetch details later if it makes the cut.
+						repositoryIsPrivateMap[repo.FullName] = repo
 					}
 				}
 			}
 		}
 	}
 
-	// 3. Process Stats per Repository.
-	if recentActivityStatsHours > 0 || adaptiveRecentActivityStats {
-		var repoName string
-		for repoName = range repositoryActivityMap {
-
-			// Function to calculate stats for a given window.
-			var calculateStatsForWindow func(int) *domain.ActivityStats = func(windowHours int) *domain.ActivityStats {
-				var currentCutoff time.Time = time.Now().Add(-time.Duration(windowHours) * time.Hour)
-				var stats *domain.ActivityStats = &domain.ActivityStats{TimeWindow: windowHours}
-
-				if includeCommits {
-					var commit *domain.Commit
-
-					for _, commit = range allCommits {
-						if commit.RepositoryName == repoName && commit.CommittedAt.After(currentCutoff) {
-							stats.CommitCount++
-						}
-					}
-				}
-
-				if includePullRequests {
-					var pullRequest *domain.PullRequest
-
-					for _, pullRequest = range allPullRequests {
-						var prRepoName string = pullRequest.RepositoryName
-
-						if strings.HasPrefix(prRepoName, "https://api.github.com/repos/") {
-							prRepoName = strings.TrimPrefix(prRepoName, "https://api.github.com/repos/")
-						}
-
-						if prRepoName == repoName && pullRequest.CreatedAt.After(currentCutoff) {
-							stats.PullRequestCount++
-						}
-					}
-				}
-
-				if includeIssues {
-					var issue *domain.Issue
-
-					for _, issue = range allIssues {
-						var issueRepoName string = issue.RepositoryName
-
-						if strings.HasPrefix(issueRepoName, "https://api.github.com/repos/") {
-							issueRepoName = strings.TrimPrefix(issueRepoName, "https://api.github.com/repos/")
-						}
-
-						if issueRepoName == repoName && issue.CreatedAt.After(currentCutoff) {
-							stats.IssueCount++
-						}
-					}
-				}
-
-				return stats
-			}
-
-			var stats *domain.ActivityStats
-
-			if adaptiveRecentActivityStats {
-				// Windows to check: current default -> Day -> Week -> Month -> Year.
-				var windows []int = []int{24, 168, 720, 8760}
-
-				// Check initial window first.
-				stats = calculateStatsForWindow(statsWindowHours)
-
-				if stats.CommitCount == 0 && stats.IssueCount == 0 && stats.PullRequestCount == 0 {
-					// Try larger windows.
-					var window int
-
-					for _, window = range windows {
-						if window > statsWindowHours {
-							stats = calculateStatsForWindow(window)
-
-							if stats.CommitCount > 0 || stats.IssueCount > 0 || stats.PullRequestCount > 0 {
-								break
-							}
-						}
-					}
-
-					// If still no activity found in the largest window (Year), fallback to All Time.
-					// Use 0 to represent All Time (Past Stats).
-					if stats.CommitCount == 0 && stats.IssueCount == 0 && stats.PullRequestCount == 0 {
-						stats = calculateStatsForWindow(0)
-					}
-				}
-			} else {
-				// Fixed window.
-				stats = calculateStatsForWindow(statsWindowHours)
-			}
-
-			// Store stats if requested (even if empty, but logic usually implies showing stats).
-			// If adaptive and still empty, we might choose to hide it or show "0 in past Year".
-			// Requirement: "If no activity found even in the Year window, stats are hidden."
-			// So only add if non-zero.
-			if stats.CommitCount > 0 || stats.IssueCount > 0 || stats.PullRequestCount > 0 {
-				repositoryStatsMap[repoName] = stats
-			}
-		}
+	// --- Phase 2: Ranking & Limiting ---
+	type Candidate struct {
+		RepoName string
+		ActiveAt time.Time
 	}
 
-	// 4. Fetch details for each unique repository.
+	var candidates []Candidate
+
+	for name, activeAt := range repositoryActivityMap {
+		candidates = append(candidates, Candidate{RepoName: name, ActiveAt: activeAt})
+	}
+
+	// Sort by ActiveAt descending.
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].ActiveAt.After(candidates[j].ActiveAt)
+	})
+
+	// Slice Top N.
+	var topCandidates []Candidate
+
+	if limitCount > 0 && len(candidates) > limitCount {
+		topCandidates = candidates[:limitCount]
+	} else {
+		topCandidates = candidates
+	}
+
+	// --- Phase 3: Hydration (Top N Only) ---
 	var contributedRepositories []*domain.ContributedRepository
+	var repositoryStatsMap map[string]*domain.ActivityStats = make(map[string]*domain.ActivityStats)
 
-	var repositoryFullName string
-	var activeAt time.Time
+	for _, candidate := range topCandidates {
+		var repoName string = candidate.RepoName
+		var repoDetails *domain.Repository
+		var fetchError error
 
-	for repositoryFullName, activeAt = range repositoryActivityMap {
-		var parts []string = strings.Split(repositoryFullName, "/")
+		// Fetch basic details (Public or Private).
+		var parts []string = strings.Split(repoName, "/")
 
 		if len(parts) != 2 {
 			continue
 		}
 
-		var owner string = parts[0]
+		repoDetails, fetchError = useCase.repositoryFetcher.FetchRepository(context, parts[0], parts[1])
 
-		var repositoryName string = parts[1]
+		if fetchError != nil {
+			fmt.Printf("Warning: Failed to fetch details for %s: %v\n", repoName, fetchError)
+			continue
+		}
 
+		// Apply Filters (Name/Topic).
 		var hasRepositoryNameFilters bool = len(repositoryNameFilters) > 0
 		var hasRepositoryTopicFilters bool = len(repositoryTopicFilters) > 0
 		var repositoryNameMatch bool = false
@@ -431,25 +249,15 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 			var filter string
 
 			for _, filter = range repositoryNameFilters {
-				if filter != "" && strings.Contains(strings.ToLower(repositoryFullName), strings.ToLower(filter)) {
+				if filter != "" && strings.Contains(strings.ToLower(repoDetails.FullName), strings.ToLower(filter)) {
 					repositoryNameMatch = true
+
 					break
 				}
 			}
 		}
 
-		var repositoryDetails *domain.Repository
-		var fetchError error
-		repositoryDetails, fetchError = useCase.repositoryFetcher.FetchRepository(context, owner, repositoryName)
-
-		if fetchError != nil {
-			// If fetching details fails, we might skip this repo or log error.
-			fmt.Printf("Failed to fetch repository details for %s/%s: %v\n", owner, repositoryName, fetchError)
-			// For robustness, skip.
-			continue
-		}
-
-		if !includePrivate && repositoryDetails.Private {
+		if !includePrivate && repoDetails.Private {
 			continue
 		}
 
@@ -465,9 +273,10 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 				var topic string
 
-				for _, topic = range repositoryDetails.Topics {
+				for _, topic = range repoDetails.Topics {
 					if strings.Contains(strings.ToLower(topic), strings.ToLower(filter)) {
 						repositoryTopicMatch = true
+
 						break
 					}
 				}
@@ -492,27 +301,187 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 			}
 		}
 
-		var isOwner bool = (strings.EqualFold(repositoryDetails.Owner, username))
+		// Check if it's a private repo that needs hydration.
+		var isPrivateCandidate bool = repositoryIsPrivateMap[repoName] != nil
 
+		// 3.1 Hydrate Latest Activity (for Private only).
+		// Public repos already have `repositoryLatestActivityMap` populated from Phase 1.
+		if isPrivateCandidate {
+			// We need to determine the *actual* latest event to display correct Title/URL/Type.
+			// PushedAt was just a proxy.
+			var latestCommit *domain.Commit
+			var latestPR *domain.PullRequest
+			var latestIssue *domain.Issue
+			var err error
+
+			// Fetch latest of each type (limit 1).
+			if includeCommits {
+				latestCommit, err = useCase.commitFetcher.GetLatestPrivateCommit(context, username, repositoryIsPrivateMap[repoName])
+				if err != nil {
+					fmt.Printf("Debug: Failed to get latest commit for %s: %v\n", repoName, err)
+				}
+			}
+			if includePullRequests {
+				latestPR, err = useCase.pullRequestFetcher.GetLatestPrivatePullRequest(context, username, repositoryIsPrivateMap[repoName])
+				if err != nil {
+					fmt.Printf("Debug: Failed to get latest PR for %s: %v\n", repoName, err)
+				}
+			}
+			if includeIssues {
+				latestIssue, err = useCase.issueFetcher.GetLatestPrivateIssue(context, username, repositoryIsPrivateMap[repoName])
+				if err != nil {
+					fmt.Printf("Debug: Failed to get latest Issue for %s: %v\n", repoName, err)
+				}
+			}
+
+			// Compare to find the winner.
+			var bestTime time.Time
+			var bestItem *domain.ActivityItem
+
+			if latestCommit != nil && latestCommit.CommittedAt.After(bestTime) {
+				bestTime = latestCommit.CommittedAt
+				var title string = latestCommit.Message
+				if idx := strings.Index(title, "\n"); idx != -1 {
+					title = title[:idx]
+				}
+				bestItem = &domain.ActivityItem{Type: domain.ActivityTypeCommit, Title: title, URL: latestCommit.HTMLURL, CreatedAt: bestTime}
+			}
+			if latestPR != nil && latestPR.CreatedAt.After(bestTime) {
+				bestTime = latestPR.CreatedAt
+				bestItem = &domain.ActivityItem{Type: domain.ActivityTypePullRequest, Title: latestPR.Title, URL: latestPR.HTMLURL, CreatedAt: bestTime}
+			}
+			if latestIssue != nil && latestIssue.CreatedAt.After(bestTime) {
+				bestTime = latestIssue.CreatedAt
+				bestItem = &domain.ActivityItem{Type: domain.ActivityTypeIssue, Title: latestIssue.Title, URL: latestIssue.HTMLURL, CreatedAt: bestTime, IssueAction: latestIssue.Action}
+			}
+
+			if bestItem != nil {
+				repositoryLatestActivityMap[repoName] = bestItem
+				// Update ActiveAt to precise time.
+				candidate.ActiveAt = bestTime
+			}
+
+			// Critical: If after checking all activity types, we still have no "Latest Activity" for this user,
+			// it means the repo was picked up by PushedAt (Phase 1.2) but the user hasn't actually contributed.
+			// Or the user contributed but it was outside the scope/time.
+			// We MUST filter out these false positives.
+			if repositoryLatestActivityMap[repoName] == nil {
+				// No activity found for this user in this private repo. Skip it.
+				continue
+			}
+		}
+
+		// 3.2 Hydrate Stats (Ladder Strategy).
+		var stats *domain.ActivityStats
+		var windows []int = []int{recentActivityStatsHours}
+
+		if adaptiveRecentActivityStats {
+			windows = []int{24, 168, 720, 8760} // Day, Week, Month, Year.
+		}
+
+		if recentActivityStatsHours <= 0 && !adaptiveRecentActivityStats {
+			windows = []int{24} // Default.
+		}
+
+		for _, window := range windows {
+			var currentCutoff time.Time = time.Now().Add(-time.Duration(window) * time.Hour)
+			var currentStats *domain.ActivityStats = &domain.ActivityStats{TimeWindow: window}
+
+			// Public Stats: Count in-memory from Phase 1 data.
+			if !isPrivateCandidate {
+				if includeCommits {
+					for _, c := range allCommits {
+						if c.RepositoryName == repoName && c.CommittedAt.After(currentCutoff) {
+							currentStats.CommitCount++
+						}
+					}
+				}
+
+				if includePullRequests {
+					for _, p := range allPullRequests {
+						var pRepo string = p.RepositoryName
+
+						if strings.HasPrefix(pRepo, "https://api.github.com/repos/") {
+							pRepo = strings.TrimPrefix(pRepo, "https://api.github.com/repos/")
+						}
+
+						if pRepo == repoName && p.CreatedAt.After(currentCutoff) {
+							currentStats.PullRequestCount++
+						}
+					}
+				}
+
+				if includeIssues {
+					for _, i := range allIssues {
+						var iRepo string = i.RepositoryName
+
+						if strings.HasPrefix(iRepo, "https://api.github.com/repos/") {
+							iRepo = strings.TrimPrefix(iRepo, "https://api.github.com/repos/")
+						}
+
+						if iRepo == repoName && i.CreatedAt.After(currentCutoff) {
+							currentStats.IssueCount++
+						}
+					}
+				}
+			} else {
+				// Private Stats: Fetch Count via API (Ladder).
+				if includeCommits {
+					var count int
+					var err error
+					count, err = useCase.commitFetcher.CountPrivateCommits(context, username, repositoryIsPrivateMap[repoName], currentCutoff, time.Now())
+
+					if err == nil {
+						currentStats.CommitCount = count
+					}
+				}
+
+				if includePullRequests {
+					var count int
+					var err error
+					count, err = useCase.pullRequestFetcher.CountPrivatePullRequests(context, username, repositoryIsPrivateMap[repoName], currentCutoff, time.Now())
+
+					if err == nil {
+						currentStats.PullRequestCount = count
+					}
+				}
+
+				if includeIssues {
+					var count int
+					var err error
+					count, err = useCase.issueFetcher.CountPrivateIssues(context, username, repositoryIsPrivateMap[repoName], currentCutoff, time.Now())
+
+					if err == nil {
+						currentStats.IssueCount = count
+					}
+				}
+			}
+
+			// If activity found, accept this window and stop laddering.
+			if currentStats.CommitCount > 0 || currentStats.PullRequestCount > 0 || currentStats.IssueCount > 0 {
+				stats = currentStats
+
+				break
+			}
+
+			// If this is the last window (Year or All Time) and still 0, we might set empty stats.
+		}
+
+		if stats != nil {
+			repositoryStatsMap[repoName] = stats
+		}
+
+		// Build Result.
+		var isOwner bool = (strings.EqualFold(repoDetails.Owner, username))
 		var contributedRepository *domain.ContributedRepository = &domain.ContributedRepository{
-			Repository:     repositoryDetails,
-			ActiveAt:       activeAt,
+			Repository:     repoDetails,
+			ActiveAt:       candidate.ActiveAt,
 			IsOwner:        isOwner,
-			ActivityStats:  repositoryStatsMap[repositoryFullName],
-			LatestActivity: repositoryLatestActivityMap[repositoryFullName],
+			ActivityStats:  repositoryStatsMap[repoName],
+			LatestActivity: repositoryLatestActivityMap[repoName],
 		}
 
 		contributedRepositories = append(contributedRepositories, contributedRepository)
-	}
-
-	// 4. Sort by ActiveAt descending.
-	sort.Slice(contributedRepositories, func(indexA, indexB int) bool {
-		return contributedRepositories[indexA].ActiveAt.After(contributedRepositories[indexB].ActiveAt)
-	})
-
-	// 5. Apply limit.
-	if limitCount > 0 && len(contributedRepositories) > limitCount {
-		contributedRepositories = contributedRepositories[:limitCount]
 	}
 
 	return contributedRepositories, nil

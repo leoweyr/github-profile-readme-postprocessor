@@ -125,6 +125,62 @@ func (fetcher *IssueActivityFetcher) FetchPrivateIssueActivities(ctx context.Con
 	return allPrivateIssues, nil
 }
 
+// GetLatestPrivateIssue fetches the single most recent issue for a repo.
+func (fetcher *IssueActivityFetcher) GetLatestPrivateIssue(ctx context.Context, username string, repo *domain.Repository) (*domain.Issue, error) {
+	// Use Search to find latest issue.
+	var query string = fmt.Sprintf("repo:%s type:issue author:%s sort:created-desc", repo.FullName, username)
+	var searchOptions *github.SearchOptions = &github.SearchOptions{
+		ListOptions: github.ListOptions{PerPage: 1},
+	}
+
+	var result *github.IssuesSearchResult
+	var searchError error
+	result, _, searchError = fetcher.client.Search.Issues(ctx, query, searchOptions)
+
+	if searchError != nil {
+		return nil, searchError
+	}
+
+	if len(result.Issues) == 0 {
+		return nil, nil
+	}
+
+	var issue *github.Issue = result.Issues[0]
+	var repositoryName string = extractRepositoryName(issue.GetHTMLURL())
+
+	return &domain.Issue{
+		Title:          issue.GetTitle(),
+		HTMLURL:        issue.GetHTMLURL(),
+		RepositoryName: repositoryName,
+		CreatedAt:      issue.GetCreatedAt().Time,
+		Number:         issue.GetNumber(),
+		Action:         enums.IssueActionCreated,
+	}, nil
+}
+
+// CountPrivateIssues counts issues in a private repo within a time window.
+func (fetcher *IssueActivityFetcher) CountPrivateIssues(ctx context.Context, username string, repo *domain.Repository, since, until time.Time) (int, error) {
+	// Use Search API for precise counting.
+	var query string = fmt.Sprintf("repo:%s type:issue author:%s created:%s..%s", repo.FullName, username, since.Format("2006-01-02"), until.Format("2006-01-02"))
+	var searchOptions *github.SearchOptions = &github.SearchOptions{
+		ListOptions: github.ListOptions{PerPage: 1},
+	}
+
+	var result *github.IssuesSearchResult
+	var searchError error
+	result, _, searchError = fetcher.client.Search.Issues(ctx, query, searchOptions)
+
+	if searchError != nil {
+		return 0, searchError
+	}
+
+	if result.Total == nil {
+		return 0, nil
+	}
+
+	return *result.Total, nil
+}
+
 func (fetcher *IssueActivityFetcher) fetchCreatedIssues(context context.Context, username string, startTime, endTime time.Time) ([]*domain.Issue, error) {
 	var activities []*domain.Issue
 	var searchOptions *github.SearchOptions = &github.SearchOptions{

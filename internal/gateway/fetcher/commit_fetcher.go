@@ -165,5 +165,103 @@ func (fetcher *CommitFetcher) FetchPrivateCommits(context context.Context, usern
 			allPrivateCommits = append(allPrivateCommits, commit)
 		}
 	}
+
 	return allPrivateCommits, nil
+}
+
+// GetLatestPrivateCommit fetches the single most recent commit for a repo to determine precise activity time.
+func (fetcher *CommitFetcher) GetLatestPrivateCommit(ctx context.Context, username string, repo *domain.Repository) (*domain.Commit, error) {
+	// Parse owner/repo.
+	var parts []string = strings.Split(repo.FullName, "/")
+
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid repo name: %s", repo.FullName)
+	}
+
+	var owner string = parts[0]
+	var repositoryName string = parts[1]
+
+	var listOptions *github.CommitsListOptions = &github.CommitsListOptions{
+		Author: username,
+		ListOptions: github.ListOptions{
+			PerPage: 1, // Only need the latest one.
+			Page:    1,
+		},
+	}
+
+	var commits []*github.RepositoryCommit
+	var listError error
+	commits, _, listError = fetcher.client.Repositories.ListCommits(ctx, owner, repositoryName, listOptions)
+
+	if listError != nil {
+		return nil, listError
+	}
+
+	if len(commits) == 0 {
+		return nil, nil // No commits found.
+	}
+
+	var item *github.RepositoryCommit = commits[0]
+
+	if item.Commit == nil {
+		return nil, nil
+	}
+
+	var committedAt time.Time
+
+	if item.Commit.Committer.Date != nil {
+		committedAt = item.Commit.Committer.Date.Time
+	}
+
+	return &domain.Commit{
+		SHA:            item.GetSHA(),
+		Message:        item.Commit.GetMessage(),
+		RepositoryName: repo.FullName,
+		HTMLURL:        item.GetHTMLURL(),
+		CommittedAt:    committedAt,
+	}, nil
+}
+
+// CountPrivateCommits efficiently counts commits in a private repo within a time window using pagination metadata.
+func (fetcher *CommitFetcher) CountPrivateCommits(ctx context.Context, username string, repo *domain.Repository, since, until time.Time) (int, error) {
+	var parts []string = strings.Split(repo.FullName, "/")
+
+	if len(parts) != 2 {
+		return 0, fmt.Errorf("invalid repo name: %s", repo.FullName)
+	}
+
+	var owner string = parts[0]
+	var repositoryName string = parts[1]
+
+	var listOptions *github.CommitsListOptions = &github.CommitsListOptions{
+		Author: username,
+		Since:  since,
+		Until:  until,
+		ListOptions: github.ListOptions{
+			PerPage: 1, // Minimal payload to get the LastPage header.
+			Page:    1,
+		},
+	}
+
+	var commits []*github.RepositoryCommit
+	var response *github.Response
+	var listError error
+	commits, response, listError = fetcher.client.Repositories.ListCommits(ctx, owner, repositoryName, listOptions)
+
+	if listError != nil {
+		return 0, listError
+	}
+
+	if len(commits) == 0 {
+		return 0, nil
+	}
+
+	// If LastPage is 0, it means there is only 1 page.
+	// Since PerPage is 1, the total count is the number of items returned (which is 1).
+	// However, if there are multiple pages, LastPage tells us the total count because PerPage is 1.
+	if response.LastPage == 0 {
+		return len(commits), nil
+	}
+
+	return response.LastPage, nil
 }
