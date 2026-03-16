@@ -117,7 +117,7 @@ func (fetcher *CommitFetcher) FetchPrivateCommits(context context.Context, usern
 			Since:  startTime,
 			Until:  endTime,
 			ListOptions: github.ListOptions{
-				PerPage: 20,
+				PerPage: 100, // Increase page size for efficiency.
 			},
 		}
 
@@ -132,37 +132,48 @@ func (fetcher *CommitFetcher) FetchPrivateCommits(context context.Context, usern
 		var repositoryName string = parts[1]
 
 		var commits []*github.RepositoryCommit
+		var response *github.Response
 		var listError error
-		commits, _, listError = fetcher.client.Repositories.ListCommits(context, owner, repositoryName, currentRepoOptions)
 
-		if listError != nil {
-			// Log error but continue to next repo.
-			fmt.Printf("DEBUG: Failed to list commits for private repo %s: %v\n", repository.FullName, listError)
-			continue
-		}
+		for {
+			commits, response, listError = fetcher.client.Repositories.ListCommits(context, owner, repositoryName, currentRepoOptions)
 
-		var item *github.RepositoryCommit
+			if listError != nil {
+				// Log error but continue to next repo.
+				fmt.Printf("DEBUG: Failed to list commits for private repo %s: %v\n", repository.FullName, listError)
 
-		for _, item = range commits {
-			if item.Commit == nil {
-				continue
+				break
 			}
 
-			var committedAt time.Time
+			var item *github.RepositoryCommit
 
-			if item.Commit.Committer.Date != nil {
-				committedAt = item.Commit.Committer.Date.Time
+			for _, item = range commits {
+				if item.Commit == nil {
+					continue
+				}
+
+				var committedAt time.Time
+
+				if item.Commit.Committer.Date != nil {
+					committedAt = item.Commit.Committer.Date.Time
+				}
+
+				var commit *domain.Commit = &domain.Commit{
+					SHA:            item.GetSHA(),
+					Message:        item.Commit.GetMessage(),
+					RepositoryName: repository.FullName,
+					HTMLURL:        item.GetHTMLURL(),
+					CommittedAt:    committedAt,
+				}
+
+				allPrivateCommits = append(allPrivateCommits, commit)
 			}
 
-			var commit *domain.Commit = &domain.Commit{
-				SHA:            item.GetSHA(),
-				Message:        item.Commit.GetMessage(),
-				RepositoryName: repository.FullName,
-				HTMLURL:        item.GetHTMLURL(),
-				CommittedAt:    committedAt,
+			if response.NextPage == 0 {
+				break
 			}
 
-			allPrivateCommits = append(allPrivateCommits, commit)
+			currentRepoOptions.ListOptions.Page = response.NextPage
 		}
 	}
 

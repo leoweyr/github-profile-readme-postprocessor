@@ -1,5 +1,5 @@
 get:
-  summary: Get Recently Contributed Repositories with Markdown
+  summary: Get Recently Contributed Repositories in Markdown Format
   description: Returns a Markdown list of repositories the user recently contributed to, filtered by criteria.
 
   tags:
@@ -8,9 +8,9 @@ get:
   parameters:
     - in: query
       name: username
+      required: true
       schema:
         type: string
-      required: true
       description: The GitHub username to fetch activity for.
 
     # Filtering options.

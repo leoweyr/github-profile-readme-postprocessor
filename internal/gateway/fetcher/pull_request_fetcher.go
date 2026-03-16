@@ -119,8 +119,9 @@ func (fetcher *PullRequestFetcher) FetchPullRequests(context context.Context, us
 // FetchPrivatePullRequests retrieves pull requests for private repositories.
 func (fetcher *PullRequestFetcher) FetchPrivatePullRequests(ctx context.Context, username string, privateRepos []*domain.Repository, startTime, endTime time.Time) ([]*domain.PullRequest, error) {
 	var allPrivatePullRequests []*domain.PullRequest
+	var repository *domain.Repository
 
-	for _, repository := range privateRepos {
+	for _, repository = range privateRepos {
 		// Optimization: Skip repositories that haven't been pushed to since the start time.
 		if !repository.PushedAt.IsZero() && repository.PushedAt.Before(startTime) {
 			continue
@@ -140,45 +141,56 @@ func (fetcher *PullRequestFetcher) FetchPrivatePullRequests(ctx context.Context,
 			Since:   startTime,
 			State:   "all",
 			ListOptions: github.ListOptions{
-				PerPage: 20,
+				PerPage: 100,
 			},
 		}
 
 		var issues []*github.Issue
+		var response *github.Response
 		var listError error
-		issues, _, listError = fetcher.client.Issues.ListByRepo(ctx, owner, repositoryName, listOptions)
 
-		if listError != nil {
-			fmt.Printf("Warning: failed to list PRs for private repo %s: %v\n", repository.FullName, listError)
-			continue
-		}
+		for {
+			issues, response, listError = fetcher.client.Issues.ListByRepo(ctx, owner, repositoryName, listOptions)
 
-		var issue *github.Issue
+			if listError != nil {
+				fmt.Printf("Warning: failed to list PRs for private repo %s: %v\n", repository.FullName, listError)
 
-		for _, issue = range issues {
-			if !issue.IsPullRequest() {
-				continue
+				break
 			}
 
-			if issue.GetCreatedAt().Before(startTime) || issue.GetCreatedAt().After(endTime) {
-				continue
+			var issue *github.Issue
+
+			for _, issue = range issues {
+				if !issue.IsPullRequest() {
+					continue
+				}
+
+				if issue.GetCreatedAt().Before(startTime) || issue.GetCreatedAt().After(endTime) {
+					continue
+				}
+
+				var pullRequest *domain.PullRequest = &domain.PullRequest{
+					Number:         issue.GetNumber(),
+					Title:          issue.GetTitle(),
+					RepositoryName: repository.FullName,
+					HTMLURL:        issue.GetHTMLURL(),
+					State:          issue.GetState(),
+					CreatedAt:      issue.GetCreatedAt().Time,
+				}
+
+				if !issue.GetClosedAt().IsZero() {
+					var closedAt time.Time = issue.GetClosedAt().Time
+					pullRequest.ClosedAt = &closedAt
+				}
+
+				allPrivatePullRequests = append(allPrivatePullRequests, pullRequest)
 			}
 
-			var pullRequest *domain.PullRequest = &domain.PullRequest{
-				Number:         issue.GetNumber(),
-				Title:          issue.GetTitle(),
-				RepositoryName: repository.FullName,
-				HTMLURL:        issue.GetHTMLURL(),
-				State:          issue.GetState(),
-				CreatedAt:      issue.GetCreatedAt().Time,
+			if response.NextPage == 0 {
+				break
 			}
 
-			if !issue.GetClosedAt().IsZero() {
-				var closedAt time.Time = issue.GetClosedAt().Time
-				pullRequest.ClosedAt = &closedAt
-			}
-
-			allPrivatePullRequests = append(allPrivatePullRequests, pullRequest)
+			listOptions.ListOptions.Page = response.NextPage
 		}
 	}
 
@@ -212,7 +224,9 @@ func (fetcher *PullRequestFetcher) GetLatestPrivatePullRequest(ctx context.Conte
 		return nil, listError
 	}
 
-	for _, pr := range prs {
+	var pr *github.PullRequest
+
+	for _, pr = range prs {
 		if pr.User != nil && pr.User.Login != nil && *pr.User.Login == username {
 			var createdAt time.Time = pr.GetCreatedAt().Time
 			var pullRequest *domain.PullRequest = &domain.PullRequest{
@@ -242,6 +256,7 @@ func (fetcher *PullRequestFetcher) CountPrivatePullRequests(ctx context.Context,
 	var result *github.IssuesSearchResult
 	var response *github.Response
 	var searchError error
+
 	result, response, searchError = fetcher.client.Search.Issues(ctx, query, searchOptions)
 
 	if searchError != nil {

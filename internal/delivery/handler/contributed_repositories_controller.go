@@ -159,6 +159,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		var parsed int
 		var conversionError error
 		parsed, conversionError = strconv.Atoi(value)
+
 		if conversionError == nil && parsed >= 0 {
 			showRecentActivityStats = parsed
 		}
@@ -537,6 +538,7 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 			if result.ActivityStats.PullRequestCount > 0 && includePullRequests {
 				stats = append(stats, fmt.Sprintf("%d Pull Requests", result.ActivityStats.PullRequestCount))
 			}
+
 			if result.ActivityStats.IssueCount > 0 && includeIssues {
 				stats = append(stats, fmt.Sprintf("%d Issues", result.ActivityStats.IssueCount))
 			}

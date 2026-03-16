@@ -74,7 +74,7 @@ func (application *Application) Run() error {
 	var shutdownSignalChannel chan os.Signal = make(chan os.Signal, 1)
 	signal.Notify(shutdownSignalChannel, os.Interrupt, syscall.SIGTERM)
 
-	// Block until we receive our signal.
+	// Block until the signal is received.
 	var serverError error
 	var terminationSignal os.Signal
 

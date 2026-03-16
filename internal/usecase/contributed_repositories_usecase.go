@@ -68,7 +68,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 	var repositoryIsPrivateMap map[string]*domain.Repository = make(map[string]*domain.Repository)
 
 	// 1.1 Public Activity Discovery (using Search API).
-	// We keep existing logic for public data as Search is relatively efficient.
+	// Retain existing logic for public data due to Search efficiency.
 	var allCommits []*domain.Commit
 	var allPullRequests []*domain.PullRequest
 	var allIssues []*domain.Issue
@@ -80,7 +80,10 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		if commitError != nil {
 			return nil, commitError
 		}
-		for _, commit := range allCommits {
+
+		var commit *domain.Commit
+
+		for _, commit = range allCommits {
 			if commit.RepositoryName == "" {
 				continue
 			}
@@ -91,7 +94,9 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				repositoryActivityMap[commit.RepositoryName] = commit.CommittedAt
 				var title string = commit.Message
 
-				if index := strings.Index(title, "\n"); index != -1 {
+				var index int = strings.Index(title, "\n")
+
+				if index != -1 {
 					title = title[:index]
 				}
 
@@ -112,15 +117,21 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		if pullRequestError != nil {
 			return nil, pullRequestError
 		}
-		for _, pullRequest := range allPullRequests {
+		var pullRequest *domain.PullRequest
+
+		for _, pullRequest = range allPullRequests {
 			var repoName string = pullRequest.RepositoryName
+
 			if strings.HasPrefix(repoName, "https://api.github.com/repos/") {
 				repoName = strings.TrimPrefix(repoName, "https://api.github.com/repos/")
 			}
+
 			if repoName == "" {
 				continue
 			}
+
 			var currentLatest time.Time = repositoryActivityMap[repoName]
+
 			if pullRequest.CreatedAt.After(currentLatest) {
 				repositoryActivityMap[repoName] = pullRequest.CreatedAt
 				repositoryLatestActivityMap[repoName] = &domain.ActivityItem{
@@ -140,7 +151,9 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		if issueError != nil {
 			return nil, issueError
 		}
-		for _, issue := range allIssues {
+		var issue *domain.Issue
+
+		for _, issue = range allIssues {
 			var repoName string = issue.RepositoryName
 
 			if strings.HasPrefix(repoName, "https://api.github.com/repos/") {
@@ -175,7 +188,9 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		if fetchPrivateErr != nil {
 			fmt.Printf("Warning: Failed to fetch private repositories: %v\n", fetchPrivateErr)
 		} else {
-			for _, repo := range privateRepos {
+			var repo *domain.Repository
+
+			for _, repo = range privateRepos {
 				// Use PushedAt as a lightweight proxy for "Latest Activity".
 				// This avoids fetching commits/issues for every private repo.
 				if !repo.PushedAt.IsZero() && !repo.PushedAt.Before(startTime) {
@@ -183,7 +198,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 					if repo.PushedAt.After(currentLatest) {
 						repositoryActivityMap[repo.FullName] = repo.PushedAt
-						// Mark as private so we know to fetch details later if it makes the cut.
+						// Mark as private to trigger detailed fetching if selected.
 						repositoryIsPrivateMap[repo.FullName] = repo
 					}
 				}
@@ -199,7 +214,10 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 	var candidates []Candidate
 
-	for name, activeAt := range repositoryActivityMap {
+	var name string
+	var activeAt time.Time
+
+	for name, activeAt = range repositoryActivityMap {
 		candidates = append(candidates, Candidate{RepoName: name, ActiveAt: activeAt})
 	}
 
@@ -221,7 +239,9 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 	var contributedRepositories []*domain.ContributedRepository
 	var repositoryStatsMap map[string]*domain.ActivityStats = make(map[string]*domain.ActivityStats)
 
-	for _, candidate := range topCandidates {
+	var candidate Candidate
+
+	for _, candidate = range topCandidates {
 		var repoName string = candidate.RepoName
 		var repoDetails *domain.Repository
 		var fetchError error
@@ -307,7 +327,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		// 3.1 Hydrate Latest Activity (for Private only).
 		// Public repos already have `repositoryLatestActivityMap` populated from Phase 1.
 		if isPrivateCandidate {
-			// We need to determine the *actual* latest event to display correct Title/URL/Type.
+			// Determine the actual latest event to display the correct Title, URL, and Type.
 			// PushedAt was just a proxy.
 			var latestCommit *domain.Commit
 			var latestPR *domain.PullRequest
@@ -321,12 +341,14 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 					fmt.Printf("Debug: Failed to get latest commit for %s: %v\n", repoName, err)
 				}
 			}
+
 			if includePullRequests {
 				latestPR, err = useCase.pullRequestFetcher.GetLatestPrivatePullRequest(context, username, repositoryIsPrivateMap[repoName])
 				if err != nil {
 					fmt.Printf("Debug: Failed to get latest PR for %s: %v\n", repoName, err)
 				}
 			}
+
 			if includeIssues {
 				latestIssue, err = useCase.issueFetcher.GetLatestPrivateIssue(context, username, repositoryIsPrivateMap[repoName])
 				if err != nil {
@@ -341,15 +363,19 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 			if latestCommit != nil && latestCommit.CommittedAt.After(bestTime) {
 				bestTime = latestCommit.CommittedAt
 				var title string = latestCommit.Message
-				if idx := strings.Index(title, "\n"); idx != -1 {
+				var idx int = strings.Index(title, "\n")
+
+				if idx != -1 {
 					title = title[:idx]
 				}
 				bestItem = &domain.ActivityItem{Type: domain.ActivityTypeCommit, Title: title, URL: latestCommit.HTMLURL, CreatedAt: bestTime}
 			}
+
 			if latestPR != nil && latestPR.CreatedAt.After(bestTime) {
 				bestTime = latestPR.CreatedAt
 				bestItem = &domain.ActivityItem{Type: domain.ActivityTypePullRequest, Title: latestPR.Title, URL: latestPR.HTMLURL, CreatedAt: bestTime}
 			}
+
 			if latestIssue != nil && latestIssue.CreatedAt.After(bestTime) {
 				bestTime = latestIssue.CreatedAt
 				bestItem = &domain.ActivityItem{Type: domain.ActivityTypeIssue, Title: latestIssue.Title, URL: latestIssue.HTMLURL, CreatedAt: bestTime, IssueAction: latestIssue.Action}
@@ -361,10 +387,10 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				candidate.ActiveAt = bestTime
 			}
 
-			// Critical: If after checking all activity types, we still have no "Latest Activity" for this user,
-			// it means the repo was picked up by PushedAt (Phase 1.2) but the user hasn't actually contributed.
-			// Or the user contributed but it was outside the scope/time.
-			// We MUST filter out these false positives.
+			// Critical: If no latest activity exists for the user after checking all types,
+			// it means the repository was picked up by PushedAt (Phase 1.2) but the user hasn't actually contributed,
+			// or the user contributed outside the scope/time.
+			// Filter out these false positives.
 			if repositoryLatestActivityMap[repoName] == nil {
 				// No activity found for this user in this private repo. Skip it.
 				continue
@@ -383,14 +409,18 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 			windows = []int{24} // Default.
 		}
 
-		for _, window := range windows {
+		var window int
+
+		for _, window = range windows {
 			var currentCutoff time.Time = time.Now().Add(-time.Duration(window) * time.Hour)
 			var currentStats *domain.ActivityStats = &domain.ActivityStats{TimeWindow: window}
 
 			// Public Stats: Count in-memory from Phase 1 data.
 			if !isPrivateCandidate {
 				if includeCommits {
-					for _, c := range allCommits {
+					var c *domain.Commit
+
+					for _, c = range allCommits {
 						if c.RepositoryName == repoName && c.CommittedAt.After(currentCutoff) {
 							currentStats.CommitCount++
 						}
@@ -398,7 +428,9 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				}
 
 				if includePullRequests {
-					for _, p := range allPullRequests {
+					var p *domain.PullRequest
+
+					for _, p = range allPullRequests {
 						var pRepo string = p.RepositoryName
 
 						if strings.HasPrefix(pRepo, "https://api.github.com/repos/") {
@@ -412,7 +444,9 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				}
 
 				if includeIssues {
-					for _, i := range allIssues {
+					var i *domain.Issue
+
+					for _, i = range allIssues {
 						var iRepo string = i.RepositoryName
 
 						if strings.HasPrefix(iRepo, "https://api.github.com/repos/") {
@@ -464,7 +498,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				break
 			}
 
-			// If this is the last window (Year or All Time) and still 0, we might set empty stats.
+			// Set empty stats if count remains zero in the final window.
 		}
 
 		if stats != nil {
