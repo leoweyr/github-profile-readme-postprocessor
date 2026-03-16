@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+# [0.3.0](https://github.com/leoweyr/github-profile-readme-postprocessor/compare/v0.2.1...v0.3.0) (2026-03-16)
+### Bug Fixes
+
+* **contributed-repositories-markdown:** truncate commit message to first line in latest activity ([995ab2b](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/995ab2be0d7a1dd79b26724deb34f0c37e6453fd)) [@leoweyr](https://github.com/leoweyr)
+* **contributed-repositories-markdown:** resolve premature limit truncation before filtering repositories ([aac619c](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/aac619cb0dd4f727cf1360ed8c16a8c1e612609e)) [@leoweyr](https://github.com/leoweyr)
+* **trend-topics-markdown:** correct endpoint registration ([1382be4](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/1382be404e81cf6d868e43cf4e9fa3336ea3cfbc)) [@leoweyr](https://github.com/leoweyr)
+* **contributed-repositories-markdown:** prevent 500 error on public activity fetch failure ([7e97bea](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/7e97bea8f96f4b6b39be2792191f7f99d76deebe)) [@leoweyr](https://github.com/leoweyr)
+
+
+### Features
+
+* **contributed-repositories-markdown:** add support for private repositories ([464f073](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/464f073cf03c0476cf511c8d3f357d4b378cefde)) [@leoweyr](https://github.com/leoweyr)
+* **trend-topics-markdown:** add endpoint with time-decay weighting algorithm ([3f438b6](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/3f438b62bc89af064990c6af764c5fa32c13188a)) [@leoweyr](https://github.com/leoweyr)
+
+
+### Performance
+
+* **contributed-repositories-markdown:** optimize contributed repositories fetching with ladder strategy ([c2fcf12](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/c2fcf1203cc80c1ff9f59c9c533d783af958932a)) [@leoweyr](https://github.com/leoweyr)
+
+
+
 # [0.2.1](https://github.com/leoweyr/github-profile-readme-postprocessor/compare/v0.2.0...v0.2.1) (2026-03-14)
 ### Bug Fixes
 
