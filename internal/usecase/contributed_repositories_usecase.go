@@ -195,30 +195,33 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		}
 	}
 
-	// 1.2 Private Activity Discovery (Optimized).
+	// 1.2 User Repository Discovery (Public & Private).
+	// Fetch all repositories (including public ones) to ensure don't miss any that
+	// might not have been indexed by the Search API yet, or are private.
 	if includePrivate {
-		var privateRepos []*domain.Repository
-		var fetchPrivateErr error
-		privateRepos, fetchPrivateErr = useCase.repositoryFetcher.FetchPrivateRepositories(context)
+		var userRepos []*domain.Repository
+		var fetchUserReposErr error
+		userRepos, fetchUserReposErr = useCase.repositoryFetcher.FetchUserRepositories(context)
 
-		if fetchPrivateErr != nil {
-			fmt.Printf("Warning: Failed to fetch private repositories: %v\n", fetchPrivateErr)
+		if fetchUserReposErr != nil {
+			fmt.Printf("Warning: Failed to fetch user repositories: %v\n", fetchUserReposErr)
 		} else {
 			var repo *domain.Repository
 
-			for _, repo = range privateRepos {
+			for _, repo = range userRepos {
 				if repo == nil {
 					continue
 				}
 
 				// Use PushedAt as a lightweight proxy for "Latest Activity".
-				// This avoids fetching commits/issues for every private repo.
+				// This avoids fetching commits/issues for every repo.
 				if !repo.PushedAt.IsZero() && !repo.PushedAt.Before(startTime) {
 					var currentLatest time.Time = repositoryActivityMap[repo.FullName]
 
 					if repo.PushedAt.After(currentLatest) {
 						repositoryActivityMap[repo.FullName] = repo.PushedAt
-						// Mark as private to trigger detailed fetching if selected.
+						// Mark as candidate for detailed hydration.
+						// (Variable name kept as repositoryIsPrivateMap for compatibility, but now tracks any repo needing hydration.)
 						repositoryIsPrivateMap[repo.FullName] = repo
 					}
 				}

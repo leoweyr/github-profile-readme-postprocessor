@@ -134,21 +134,26 @@ func (useCase *TrendTopicsUseCase) Execute(
 		}
 	}
 
-	// 1.2 Private Activity Discovery.
-	// Cache repositories to avoid re-fetching details later.
+	// 1.2 User Repository Discovery.
+	// Fetch all repositories (including public) to ensure we have a complete list
+	// of candidates for trend analysis, bypassing potential Search API delays.
 	var repoCache map[string]*domain.Repository = make(map[string]*domain.Repository)
 
 	if includePrivate {
-		var privateRepos []*domain.Repository
-		var fetchPrivateErr error
-		privateRepos, fetchPrivateErr = useCase.repositoryFetcher.FetchPrivateRepositories(context)
+		var userRepos []*domain.Repository
+		var fetchUserReposErr error
+		userRepos, fetchUserReposErr = useCase.repositoryFetcher.FetchUserRepositories(context)
 
-		if fetchPrivateErr != nil {
-			fmt.Printf("Warning: Failed to fetch private repositories: %v\n", fetchPrivateErr)
+		if fetchUserReposErr != nil {
+			fmt.Printf("Warning: Failed to fetch user repositories: %v\n", fetchUserReposErr)
 		} else {
 			var repo *domain.Repository
 
-			for _, repo = range privateRepos {
+			for _, repo = range userRepos {
+				if repo == nil {
+					continue
+				}
+
 				if !repo.PushedAt.IsZero() && repo.PushedAt.After(startTime) {
 					activeRepoNames[repo.FullName] = true
 					activePrivateRepos = append(activePrivateRepos, repo)

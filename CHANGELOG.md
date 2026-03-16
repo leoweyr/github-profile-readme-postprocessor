@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+# [0.3.1](https://github.com/leoweyr/github-profile-readme-postprocessor/compare/v0.3.0...v0.3.1) (2026-03-16)
+### Bug Fixes
+
+* **contributed-repositories-markdown:** parse adaptive show recent activity stats param ([b30f0ed](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/b30f0eda91036a43a590c1470e57ee62e975c9b7)) [@leoweyr](https://github.com/leoweyr)
+* **contributed-repositories-markdown:** reliably discover both public and private repositories, bypassing search API limitations ([9bf83cd](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/9bf83cd4abb2fd25244a0df84520f3619b58bc8b)) [@leoweyr](https://github.com/leoweyr)
+
+
+
 # [0.3.0](https://github.com/leoweyr/github-profile-readme-postprocessor/compare/v0.2.1...v0.3.0) (2026-03-16)
 ### Bug Fixes
 

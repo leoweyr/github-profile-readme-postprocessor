@@ -34,5 +34,5 @@ type PullRequestFetcher interface {
 // RepositoryFetcher defines the interface for fetching repository details.
 type RepositoryFetcher interface {
 	FetchRepository(context context.Context, owner, repositoryName string) (*domain.Repository, error)
-	FetchPrivateRepositories(ctx context.Context) ([]*domain.Repository, error)
+	FetchUserRepositories(ctx context.Context) ([]*domain.Repository, error)
 }
