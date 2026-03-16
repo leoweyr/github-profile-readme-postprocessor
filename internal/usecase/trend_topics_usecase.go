@@ -271,6 +271,10 @@ func (useCase *TrendTopicsUseCase) Execute(
 			repoCache[repoName] = repoDetails
 		}
 
+		if repoDetails == nil {
+			continue
+		}
+
 		if !includePrivate && repoDetails.Private {
 			continue
 		}

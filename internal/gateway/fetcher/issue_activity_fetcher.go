@@ -324,6 +324,11 @@ func (fetcher *IssueActivityFetcher) fetchIssueComments(context context.Context,
 
 		for _, comment = range comments {
 			// Check if comment is by the user.
+			// Ensure User is not nil before accessing Login.
+			if comment.User == nil || comment.User.Login == nil {
+				continue
+			}
+
 			if comment.GetUser().GetLogin() != username {
 				continue
 			}

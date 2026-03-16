@@ -226,22 +226,19 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		return candidates[i].ActiveAt.After(candidates[j].ActiveAt)
 	})
 
-	// Slice Top N.
-	var topCandidates []Candidate
-
-	if limitCount > 0 && len(candidates) > limitCount {
-		topCandidates = candidates[:limitCount]
-	} else {
-		topCandidates = candidates
-	}
-
-	// --- Phase 3: Hydration (Top N Only) ---
+	// Slice Top N logic resides inside the loop to support filtering.
+	// Iterate through all candidates until finding enough matching repositories.
 	var contributedRepositories []*domain.ContributedRepository
 	var repositoryStatsMap map[string]*domain.ActivityStats = make(map[string]*domain.ActivityStats)
 
 	var candidate Candidate
 
-	for _, candidate = range topCandidates {
+	for _, candidate = range candidates {
+		// Stop if we have reached the requested limit.
+		if limitCount > 0 && len(contributedRepositories) >= limitCount {
+			break
+		}
+
 		var repoName string = candidate.RepoName
 		var repoDetails *domain.Repository
 		var fetchError error
@@ -322,7 +319,8 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		}
 
 		// Check if it's a private repo that needs hydration.
-		var isPrivateCandidate bool = repositoryIsPrivateMap[repoName] != nil
+		var privateRepo *domain.Repository = repositoryIsPrivateMap[repoName]
+		var isPrivateCandidate bool = privateRepo != nil
 
 		// 3.1 Hydrate Latest Activity (for Private only).
 		// Public repos already have `repositoryLatestActivityMap` populated from Phase 1.
@@ -336,21 +334,24 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 			// Fetch latest of each type (limit 1).
 			if includeCommits {
-				latestCommit, err = useCase.commitFetcher.GetLatestPrivateCommit(context, username, repositoryIsPrivateMap[repoName])
+				latestCommit, err = useCase.commitFetcher.GetLatestPrivateCommit(context, username, privateRepo)
+
 				if err != nil {
 					fmt.Printf("Debug: Failed to get latest commit for %s: %v\n", repoName, err)
 				}
 			}
 
 			if includePullRequests {
-				latestPR, err = useCase.pullRequestFetcher.GetLatestPrivatePullRequest(context, username, repositoryIsPrivateMap[repoName])
+				latestPR, err = useCase.pullRequestFetcher.GetLatestPrivatePullRequest(context, username, privateRepo)
+
 				if err != nil {
 					fmt.Printf("Debug: Failed to get latest PR for %s: %v\n", repoName, err)
 				}
 			}
 
 			if includeIssues {
-				latestIssue, err = useCase.issueFetcher.GetLatestPrivateIssue(context, username, repositoryIsPrivateMap[repoName])
+				latestIssue, err = useCase.issueFetcher.GetLatestPrivateIssue(context, username, privateRepo)
+
 				if err != nil {
 					fmt.Printf("Debug: Failed to get latest Issue for %s: %v\n", repoName, err)
 				}
@@ -398,7 +399,6 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		}
 
 		// 3.2 Hydrate Stats (Ladder Strategy).
-		var stats *domain.ActivityStats
 		var windows []int = []int{recentActivityStatsHours}
 
 		if adaptiveRecentActivityStats {
@@ -409,6 +409,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 			windows = []int{24} // Default.
 		}
 
+		var stats *domain.ActivityStats
 		var window int
 
 		for _, window = range windows {
@@ -463,7 +464,11 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				if includeCommits {
 					var count int
 					var err error
-					count, err = useCase.commitFetcher.CountPrivateCommits(context, username, repositoryIsPrivateMap[repoName], currentCutoff, time.Now())
+
+					// Note: privateRepo is guaranteed non-nil here because isPrivateCandidate is checked above
+					if privateRepo != nil {
+						count, err = useCase.commitFetcher.CountPrivateCommits(context, username, privateRepo, currentCutoff, time.Now())
+					}
 
 					if err == nil {
 						currentStats.CommitCount = count
@@ -473,7 +478,10 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				if includePullRequests {
 					var count int
 					var err error
-					count, err = useCase.pullRequestFetcher.CountPrivatePullRequests(context, username, repositoryIsPrivateMap[repoName], currentCutoff, time.Now())
+
+					if privateRepo != nil {
+						count, err = useCase.pullRequestFetcher.CountPrivatePullRequests(context, username, privateRepo, currentCutoff, time.Now())
+					}
 
 					if err == nil {
 						currentStats.PullRequestCount = count
@@ -483,7 +491,10 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				if includeIssues {
 					var count int
 					var err error
-					count, err = useCase.issueFetcher.CountPrivateIssues(context, username, repositoryIsPrivateMap[repoName], currentCutoff, time.Now())
+
+					if privateRepo != nil {
+						count, err = useCase.issueFetcher.CountPrivateIssues(context, username, privateRepo, currentCutoff, time.Now())
+					}
 
 					if err == nil {
 						currentStats.IssueCount = count

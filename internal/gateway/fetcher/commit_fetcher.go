@@ -58,9 +58,14 @@ func (fetcher *CommitFetcher) FetchCommits(context context.Context, username str
 			return nil, fmt.Errorf("failed to search commits: %w", searchError)
 		}
 
+		if result == nil {
+			break
+		}
+
 		var item *github.CommitResult
+
 		for _, item = range result.Commits {
-			if item.Commit == nil || item.Commit.Committer == nil {
+			if item == nil || item.Commit == nil || item.Commit.Committer == nil {
 				continue
 			}
 
@@ -148,7 +153,8 @@ func (fetcher *CommitFetcher) FetchPrivateCommits(context context.Context, usern
 			var item *github.RepositoryCommit
 
 			for _, item = range commits {
-				if item.Commit == nil {
+				// Ensure Commit and Committer are present to avoid panic.
+				if item.Commit == nil || item.Commit.Committer == nil {
 					continue
 				}
 
@@ -214,7 +220,7 @@ func (fetcher *CommitFetcher) GetLatestPrivateCommit(ctx context.Context, userna
 
 	var item *github.RepositoryCommit = commits[0]
 
-	if item.Commit == nil {
+	if item.Commit == nil || item.Commit.Committer == nil {
 		return nil, nil
 	}
 
@@ -267,9 +273,14 @@ func (fetcher *CommitFetcher) CountPrivateCommits(ctx context.Context, username 
 		return 0, nil
 	}
 
+	// Safety check: ensure response is not nil before accessing LastPage.
+	if response == nil {
+		return len(commits), nil
+	}
+
 	// If LastPage is 0, it means there is only 1 page.
 	// Since PerPage is 1, the total count is the number of items returned (which is 1).
-	// However, if there are multiple pages, LastPage tells us the total count because PerPage is 1.
+	// However, if there are multiple pages, LastPage indicates the total count because PerPage is 1.
 	if response.LastPage == 0 {
 		return len(commits), nil
 	}

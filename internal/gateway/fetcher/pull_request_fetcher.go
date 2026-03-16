@@ -98,7 +98,7 @@ func (fetcher *PullRequestFetcher) FetchPullRequests(context context.Context, us
 
 			// Check for merge status via PullRequestLinks.
 			// The Issue struct contains PullRequestLinks which provides the MergedAt timestamp.
-			if issue.PullRequestLinks != nil && !issue.PullRequestLinks.MergedAt.IsZero() {
+			if issue.PullRequestLinks != nil && issue.PullRequestLinks.MergedAt != nil && !issue.PullRequestLinks.MergedAt.IsZero() {
 				var mergedTimestamp time.Time = issue.PullRequestLinks.MergedAt.Time
 				pullRequest.MergedAt = &mergedTimestamp
 			}

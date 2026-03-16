@@ -65,7 +65,10 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		}
 	}
 
-	// Default time range: last 30 days if not specified.
+	// Default time range: last 1 year (365 days) if not specified.
+	// This ensures discovery of relevant projects from the standard "Contribution Year" window,
+	// rather than an arbitrary short timeframe like 30 days.
+	// The adaptive stats engine will later determine the best display granularity (Week/Month/Year).
 	endTime = time.Now()
 	value = queryValues.Get("until")
 
@@ -79,7 +82,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		}
 	}
 
-	startTime = endTime.AddDate(0, 0, -30)
+	startTime = endTime.AddDate(-1, 0, 0)
 	value = queryValues.Get("since")
 
 	if value != "" {
@@ -163,13 +166,6 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		if conversionError == nil && parsed >= 0 {
 			showRecentActivityStats = parsed
 		}
-	}
-
-	adaptiveRecentActivityStats = false
-	var adaptiveValue string = queryValues.Get("adaptive_show_recent_activity_stats")
-
-	if adaptiveValue == "true" {
-		adaptiveRecentActivityStats = true
 	}
 
 	showLatestActivity = false

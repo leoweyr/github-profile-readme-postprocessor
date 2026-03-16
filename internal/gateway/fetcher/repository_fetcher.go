@@ -51,12 +51,18 @@ func (fetcher *RepositoryFetcher) FetchRepository(context context.Context, owner
 
 	var topics []string = repository.Topics
 
+	var ownerName string
+
+	if repository.Owner != nil && repository.Owner.Login != nil {
+		ownerName = repository.GetOwner().GetLogin()
+	}
+
 	var domainRepository *domain.Repository = &domain.Repository{
 		Name:        repository.GetName(),
 		FullName:    repository.GetFullName(),
 		Description: description,
 		HTMLURL:     repository.GetHTMLURL(),
-		Owner:       repository.GetOwner().GetLogin(),
+		Owner:       ownerName,
 		Topics:      topics,
 		Private:     repository.GetPrivate(),
 	}
@@ -91,10 +97,20 @@ func (fetcher *RepositoryFetcher) FetchPrivateRepositories(context context.Conte
 		var repository *github.Repository
 
 		for _, repository = range repositories {
+			if repository == nil {
+				continue
+			}
+
 			var pushedAt time.Time
 
 			if repository.PushedAt != nil {
 				pushedAt = repository.PushedAt.Time
+			}
+
+			var ownerName string
+
+			if repository.Owner != nil && repository.Owner.Login != nil {
+				ownerName = repository.GetOwner().GetLogin()
 			}
 
 			var domainRepository *domain.Repository = &domain.Repository{
@@ -102,7 +118,7 @@ func (fetcher *RepositoryFetcher) FetchPrivateRepositories(context context.Conte
 				FullName:    repository.GetFullName(),
 				Description: repository.GetDescription(),
 				HTMLURL:     repository.GetHTMLURL(),
-				Owner:       repository.GetOwner().GetLogin(),
+				Owner:       ownerName,
 				Topics:      repository.Topics,
 				Private:     true,
 				PushedAt:    pushedAt,
