@@ -168,6 +168,19 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		}
 	}
 
+	adaptiveRecentActivityStats = false
+	var adaptiveValue string = queryValues.Get("adaptive_show_recent_activity_stats")
+
+	if adaptiveValue != "" {
+		var parsed bool
+		var parseError error
+		parsed, parseError = strconv.ParseBool(adaptiveValue)
+
+		if parseError == nil {
+			adaptiveRecentActivityStats = parsed
+		}
+	}
+
 	showLatestActivity = false
 	var showLatestValue string = queryValues.Get("show_latest_activity")
 
