@@ -61,8 +61,132 @@ func (fetcher *IssueActivityFetcher) FetchIssueActivities(context context.Contex
 	return allActivities, nil
 }
 
+// FetchPrivateIssueActivities retrieves issue activities for private repositories.
+func (fetcher *IssueActivityFetcher) FetchPrivateIssueActivities(ctx context.Context, username string, privateRepos []*domain.Repository, startTime, endTime time.Time) ([]*domain.Issue, error) {
+	var allPrivateIssues []*domain.Issue
+
+	var repository *domain.Repository
+
+	for _, repository = range privateRepos {
+		// Optimization: Skip repositories that haven't been pushed to since the start time.
+		if !repository.PushedAt.IsZero() && repository.PushedAt.Before(startTime) {
+			continue
+		}
+
+		var parts []string = strings.Split(repository.FullName, "/")
+
+		if len(parts) != 2 {
+			continue
+		}
+
+		var owner string = parts[0]
+		var repositoryName string = parts[1]
+
+		var listOptions *github.IssueListByRepoOptions = &github.IssueListByRepoOptions{
+			Creator: username,
+			Since:   startTime,
+			State:   "all",
+			ListOptions: github.ListOptions{
+				PerPage: 20,
+			},
+		}
+
+		var issues []*github.Issue
+		var listError error
+		issues, _, listError = fetcher.client.Issues.ListByRepo(ctx, owner, repositoryName, listOptions)
+
+		if listError != nil {
+			fmt.Printf("Warning: failed to list issues for private repo %s: %v\n", repository.FullName, listError)
+			continue
+		}
+
+		var issue *github.Issue
+
+		for _, issue = range issues {
+			if issue.IsPullRequest() {
+				continue // handled by PullRequestFetcher.
+			}
+
+			if issue.GetCreatedAt().Before(startTime) || issue.GetCreatedAt().After(endTime) {
+				continue
+			}
+
+			var activity *domain.Issue = &domain.Issue{
+				Title:          issue.GetTitle(),
+				HTMLURL:        issue.GetHTMLURL(),
+				RepositoryName: repository.FullName,
+				CreatedAt:      issue.GetCreatedAt().Time,
+				Number:         issue.GetNumber(),
+				Action:         enums.IssueActionCreated,
+			}
+
+			allPrivateIssues = append(allPrivateIssues, activity)
+		}
+	}
+
+	return allPrivateIssues, nil
+}
+
+// GetLatestPrivateIssue fetches the single most recent issue for a repo.
+func (fetcher *IssueActivityFetcher) GetLatestPrivateIssue(ctx context.Context, username string, repo *domain.Repository) (*domain.Issue, error) {
+	// Use Search to find latest issue.
+	var query string = fmt.Sprintf("repo:%s type:issue author:%s sort:created-desc", repo.FullName, username)
+	var searchOptions *github.SearchOptions = &github.SearchOptions{
+		ListOptions: github.ListOptions{PerPage: 1},
+	}
+
+	var result *github.IssuesSearchResult
+	var searchError error
+	result, _, searchError = fetcher.client.Search.Issues(ctx, query, searchOptions)
+
+	if searchError != nil {
+		return nil, searchError
+	}
+
+	if len(result.Issues) == 0 {
+		return nil, nil
+	}
+
+	var issue *github.Issue = result.Issues[0]
+	var repositoryName string = extractRepositoryName(issue.GetHTMLURL())
+
+	return &domain.Issue{
+		Title:          issue.GetTitle(),
+		HTMLURL:        issue.GetHTMLURL(),
+		RepositoryName: repositoryName,
+		CreatedAt:      issue.GetCreatedAt().Time,
+		Number:         issue.GetNumber(),
+		Action:         enums.IssueActionCreated,
+	}, nil
+}
+
+// CountPrivateIssues counts issues in a private repo within a time window.
+func (fetcher *IssueActivityFetcher) CountPrivateIssues(ctx context.Context, username string, repo *domain.Repository, since, until time.Time) (int, error) {
+	// Use Search API for precise counting.
+	var query string = fmt.Sprintf("repo:%s type:issue author:%s created:%s..%s", repo.FullName, username, since.Format("2006-01-02"), until.Format("2006-01-02"))
+	var searchOptions *github.SearchOptions = &github.SearchOptions{
+		ListOptions: github.ListOptions{PerPage: 1},
+	}
+
+	var result *github.IssuesSearchResult
+	var searchError error
+	result, _, searchError = fetcher.client.Search.Issues(ctx, query, searchOptions)
+
+	if searchError != nil {
+		return 0, searchError
+	}
+
+	if result.Total == nil {
+		return 0, nil
+	}
+
+	return *result.Total, nil
+}
+
 func (fetcher *IssueActivityFetcher) fetchCreatedIssues(context context.Context, username string, startTime, endTime time.Time) ([]*domain.Issue, error) {
 	var activities []*domain.Issue
+
+	// Search API has a 1000 item limit, but paging is handled.
 	var searchOptions *github.SearchOptions = &github.SearchOptions{
 		ListOptions: github.ListOptions{PerPage: 100},
 		Sort:        "created",
@@ -72,11 +196,11 @@ func (fetcher *IssueActivityFetcher) fetchCreatedIssues(context context.Context,
 	var dateRange string = fmt.Sprintf("%s..%s", startTime.Format("2006-01-02"), endTime.Format("2006-01-02"))
 	var query string = fmt.Sprintf("author:%s type:issue created:%s", username, dateRange)
 
-	for {
-		var result *github.IssuesSearchResult
-		var response *github.Response
-		var searchError error
+	var result *github.IssuesSearchResult
+	var response *github.Response
+	var searchError error
 
+	for {
 		result, response, searchError = fetcher.client.Search.Issues(context, query, searchOptions)
 
 		if searchError != nil {
@@ -122,12 +246,13 @@ func (fetcher *IssueActivityFetcher) fetchCommentedIssues(context context.Contex
 	// Note: The updated:>=startTime filter captures issues that might have old creation dates but new comments.
 	var query string = fmt.Sprintf("commenter:%s type:issue updated:>=%s", username, startTime.Format("2006-01-02"))
 
-	for {
-		var result *github.IssuesSearchResult
-		var response *github.Response
-		var searchError error
+	var result *github.IssuesSearchResult
+	var response *github.Response
+	var searchError error
 
+	for {
 		result, response, searchError = fetcher.client.Search.Issues(context, query, searchOptions)
+
 		if searchError != nil {
 			return nil, searchError
 		}
@@ -136,6 +261,7 @@ func (fetcher *IssueActivityFetcher) fetchCommentedIssues(context context.Contex
 
 		for _, issue = range result.Issues {
 			var repositoryName string = extractRepositoryName(issue.GetHTMLURL())
+
 			if repositoryName == "" {
 				continue
 			}
@@ -159,6 +285,7 @@ func (fetcher *IssueActivityFetcher) fetchCommentedIssues(context context.Contex
 				// Log error but continue with other issues.
 				// Print to stdout for debugging since no logger is available.
 				fmt.Printf("Warning: failed to fetch comments for %s/%s#%d: %v\n", owner, repoName, issue.GetNumber(), fetchCommentsError)
+
 				continue
 			}
 
@@ -182,12 +309,13 @@ func (fetcher *IssueActivityFetcher) fetchIssueComments(context context.Context,
 		Since:       &startTime, // Optimization: only fetch comments updated since startTime.
 	}
 
-	for {
-		var comments []*github.IssueComment
-		var response *github.Response
-		var listError error
+	var comments []*github.IssueComment
+	var response *github.Response
+	var listError error
 
+	for {
 		comments, response, listError = fetcher.client.Issues.ListComments(context, owner, repositoryName, issueNumber, listOptions)
+
 		if listError != nil {
 			return nil, listError
 		}
@@ -196,6 +324,11 @@ func (fetcher *IssueActivityFetcher) fetchIssueComments(context context.Context,
 
 		for _, comment = range comments {
 			// Check if comment is by the user.
+			// Ensure User is not nil before accessing Login.
+			if comment.User == nil || comment.User.Login == nil {
+				continue
+			}
+
 			if comment.GetUser().GetLogin() != username {
 				continue
 			}

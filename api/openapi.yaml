@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: GitHub Profile Readme PostProcessor
   description: A tool that leverages GitHub's built-in features to automatically update your GitHub profile readme file based on your situation and display needs, making the resume of your open-source journey on GitHub more direct, pure, and clear.
-  version: 0.8.0
+  version: 0.10.0
 
 servers:
   - url: '/v1'
@@ -16,3 +16,6 @@ paths:
 
   /contributed-repositories/markdown:
     $ref: './paths/contributed-repositories/markdown.yaml'
+
+  /trend-topics/markdown:
+    $ref: './paths/trend-topics/markdown.yaml'

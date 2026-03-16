@@ -1,0 +1,52 @@
+get:
+  summary: Get Trend Topics in Markdown Format
+  description: Returns a markdown string representing the trending topics based on contribution activity.
+
+  tags:
+    - Markdown
+
+  parameters:
+    - in: query
+      name: username
+      required: true
+      schema:
+        type: string
+      description: The GitHub username to fetch trend topics for.
+
+    - in: query
+      name: time_limit_hours
+      schema:
+        type: integer
+        default: 24
+      description: The time limit in hours to analyze activities (default 24).
+
+    - in: query
+      name: highlight_threshold_percentage
+      schema:
+        type: number
+        format: float
+        default: 0.1
+      description: The percentage threshold to highlight a topic (e.g., 0.1 for 10%).
+
+    - in: query
+      name: limit_count
+      schema:
+        type: integer
+        default: 10
+      description: The maximum number of topics to display.
+
+    - in: query
+      name: include_private
+      schema:
+        type: boolean
+        default: false
+      description: Whether to include private repositories.
+
+  responses:
+    '200':
+      description: A Markdown formatted list of topics.
+      content:
+        text/markdown:
+          schema:
+            type: string
+            example: "<code>automation(50%)</code> <code>docker</code> <code>serverless</code> <code>terraform</code> <code>github-profile</code> <code>infrastructure-as-code</code> <code>cloud-native</code> <code>graphql-api</code> <code>zero-trust</code> <code>github-actions</code> <code>profile-readme-generator</code>"

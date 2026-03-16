@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+# [0.3.0](https://github.com/leoweyr/github-profile-readme-postprocessor/compare/v0.2.1...v0.3.0) (2026-03-16)
+### Bug Fixes
+
+* **contributed-repositories-markdown:** truncate commit message to first line in latest activity ([995ab2b](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/995ab2be0d7a1dd79b26724deb34f0c37e6453fd)) [@leoweyr](https://github.com/leoweyr)
+* **contributed-repositories-markdown:** resolve premature limit truncation before filtering repositories ([aac619c](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/aac619cb0dd4f727cf1360ed8c16a8c1e612609e)) [@leoweyr](https://github.com/leoweyr)
+* **trend-topics-markdown:** correct endpoint registration ([1382be4](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/1382be404e81cf6d868e43cf4e9fa3336ea3cfbc)) [@leoweyr](https://github.com/leoweyr)
+* **contributed-repositories-markdown:** prevent 500 error on public activity fetch failure ([7e97bea](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/7e97bea8f96f4b6b39be2792191f7f99d76deebe)) [@leoweyr](https://github.com/leoweyr)
+
+
+### Features
+
+* **contributed-repositories-markdown:** add support for private repositories ([464f073](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/464f073cf03c0476cf511c8d3f357d4b378cefde)) [@leoweyr](https://github.com/leoweyr)
+* **trend-topics-markdown:** add endpoint with time-decay weighting algorithm ([3f438b6](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/3f438b62bc89af064990c6af764c5fa32c13188a)) [@leoweyr](https://github.com/leoweyr)
+
+
+### Performance
+
+* **contributed-repositories-markdown:** optimize contributed repositories fetching with ladder strategy ([c2fcf12](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/c2fcf1203cc80c1ff9f59c9c533d783af958932a)) [@leoweyr](https://github.com/leoweyr)
+
+
+
 # [0.2.1](https://github.com/leoweyr/github-profile-readme-postprocessor/compare/v0.2.0...v0.2.1) (2026-03-14)
 ### Bug Fixes
 
@@ -12,6 +33,33 @@ All notable changes to this project will be documented in this file.
 
 * **github-action-app:** add debug logging for fetched content ([12b6c84](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/12b6c8408fc33eda2ac739941c2ffd8cc5848e57)) [@leoweyr](https://github.com/leoweyr)
 * **github-action-app:** add include request URL in debug log output ([2859341](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/2859341ec9ea8e0e72611e1fe5efced3f9d824c0)) [@leoweyr](https://github.com/leoweyr)
+
+
+
+# [0.2.0](https://github.com/leoweyr/github-profile-readme-postprocessor/compare/v0.1.0...v0.2.0) (2026-03-14)
+### Bug Fixes
+
+* **contributed-repositories-markdown:** include user issues in activity statistics ([8b0b5b4](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/8b0b5b4832e3560f6b91ecf130a471ac77af889f)) [@leoweyr](https://github.com/leoweyr)
+
+
+### Features
+
+* **contributed-repositories-markdown:** add activity timestamp to markdown response ([a97b2ad](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/a97b2adc7c298238124997e73ff28656cdea9cec)) [@leoweyr](https://github.com/leoweyr)
+* **github-action-app:** support sorting activity blocks by timestamp ([d3de7d1](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/d3de7d1006e4e0ed9f7aaf5bbefbdaa66fdcb5f4)) [@leoweyr](https://github.com/leoweyr)
+* **contributed-repositories-markdown:** add recent activity stats ([22b499c](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/22b499c2460d398ff6c6dfbd49887c02a9b6ea48)) [@leoweyr](https://github.com/leoweyr)
+* **contributed-repositories-markdown:** add adaptive recent activity stats ([c6a755a](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/c6a755a55136cb24ce5e4564582f499de6c8b03b)) [@leoweyr](https://github.com/leoweyr)
+* **contributed-repositories-markdown:** add show latest activity ([1db7fac](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/1db7facdf18526ef533898017fd9c5eda56c4698)) [@leoweyr](https://github.com/leoweyr)
+
+
+### Documentation
+
+* **readme:** add banner ([70b5c7a](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/70b5c7a0b8ad4e0ef7be9b447bb3f1ab020c9ff0)) [@leoweyr](https://github.com/leoweyr)
+
+
+### Miscellaneous Tasks
+
+* add icon ([8a80d54](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/8a80d5412851dd6ff6846916191545a6384ebb40)) [@leoweyr](https://github.com/leoweyr)
+* add branding configuration for marketplace release ([eacb847](https://github.com/leoweyr/github-profile-readme-postprocessor/commit/eacb8474c900ca39418828b920a123d5f22e7327)) [@leoweyr](https://github.com/leoweyr)
 
 
 

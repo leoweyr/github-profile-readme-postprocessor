@@ -1,5 +1,5 @@
 get:
-  summary: Get Recently Contributed Repositories with Markdown
+  summary: Get Recently Contributed Repositories in Markdown Format
   description: Returns a Markdown list of repositories the user recently contributed to, filtered by criteria.
 
   tags:
@@ -8,12 +8,26 @@ get:
   parameters:
     - in: query
       name: username
+      required: true
       schema:
         type: string
-      required: true
       description: The GitHub username to fetch activity for.
 
     # Filtering options.
+
+    - in: query
+      name: include_private
+      schema:
+        type: boolean
+        default: false
+      description: |
+        Indicates whether to include private repositories. 
+
+        If true:
+        - Private repositories are included but anonymized (e.g., "my-project" -> "Project: MP").
+        - Marked with a `Private` tag.
+        - Activity stats are shown.
+        - Latest Activity details are hidden.
 
     - in: query
       name: limit_count

@@ -41,6 +41,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 	showRecentActivityStats int,
 	adaptiveRecentActivityStats bool,
 	showLatestActivity bool,
+	includePrivate bool,
 	parseError error,
 ) {
 	var queryValues url.Values = request.URL.Query()
@@ -48,7 +49,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 	username = queryValues.Get("username")
 
 	if username == "" {
-		return "", 0, time.Time{}, time.Time{}, nil, nil, false, false, false, 0, false, false, fmt.Errorf("missing required parameter: username")
+		return "", 0, time.Time{}, time.Time{}, nil, nil, false, false, false, 0, false, false, false, fmt.Errorf("missing required parameter: username")
 	}
 
 	limitCount = 3
@@ -64,7 +65,10 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		}
 	}
 
-	// Default time range: last 30 days if not specified.
+	// Default time range: last 1 year (365 days) if not specified.
+	// This ensures discovery of relevant projects from the standard "Contribution Year" window,
+	// rather than an arbitrary short timeframe like 30 days.
+	// The adaptive stats engine will later determine the best display granularity (Week/Month/Year).
 	endTime = time.Now()
 	value = queryValues.Get("until")
 
@@ -78,7 +82,7 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		}
 	}
 
-	startTime = endTime.AddDate(0, 0, -30)
+	startTime = endTime.AddDate(-1, 0, 0)
 	value = queryValues.Get("since")
 
 	if value != "" {
@@ -158,16 +162,10 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		var parsed int
 		var conversionError error
 		parsed, conversionError = strconv.Atoi(value)
+
 		if conversionError == nil && parsed >= 0 {
 			showRecentActivityStats = parsed
 		}
-	}
-
-	adaptiveRecentActivityStats = false
-	var adaptiveValue string = queryValues.Get("adaptive_show_recent_activity_stats")
-
-	if adaptiveValue == "true" {
-		adaptiveRecentActivityStats = true
 	}
 
 	showLatestActivity = false
@@ -177,7 +175,19 @@ func (controller *ContributedRepositoriesController) parseQueryParameters(reques
 		showLatestActivity = true
 	}
 
-	return username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, includeIssues, showRecentActivityStats, adaptiveRecentActivityStats, showLatestActivity, nil
+	includePrivate = false
+	var includePrivateValue string = queryValues.Get("include_private")
+
+	if includePrivateValue != "" {
+		var parsed bool
+		var parseBoolError error
+		parsed, parseBoolError = strconv.ParseBool(includePrivateValue)
+		if parseBoolError == nil {
+			includePrivate = parsed
+		}
+	}
+
+	return username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, includeIssues, showRecentActivityStats, adaptiveRecentActivityStats, showLatestActivity, includePrivate, nil
 }
 
 // formatTimeAgo formats the duration since the given time as a human-readable string.
@@ -250,6 +260,53 @@ func (controller *ContributedRepositoriesController) formatTimeAgo(targetTime ti
 	return fmt.Sprintf("%d years ago", years)
 }
 
+// anonymizeRepositoryName converts a repository name to its acronym (e.g., "my-awesome-project" -> "MAP").
+func (controller *ContributedRepositoriesController) anonymizeRepositoryName(name string) string {
+	var words []string
+	var currentWord strings.Builder
+	var index int
+	var character rune
+
+	for index, character = range name {
+		if character == '-' || character == '_' || character == ' ' {
+			if currentWord.Len() > 0 {
+				words = append(words, currentWord.String())
+				currentWord.Reset()
+			}
+		} else if index > 0 && character >= 'A' && character <= 'Z' && name[index-1] >= 'a' && name[index-1] <= 'z' {
+			// CamelCase split (lowercase followed by uppercase).
+			if currentWord.Len() > 0 {
+				words = append(words, currentWord.String())
+				currentWord.Reset()
+			}
+
+			currentWord.WriteRune(character)
+		} else {
+			currentWord.WriteRune(character)
+		}
+	}
+
+	if currentWord.Len() > 0 {
+		words = append(words, currentWord.String())
+	}
+
+	var acronym strings.Builder
+	var word string
+
+	for _, word = range words {
+		if len(word) > 0 {
+			// Take the first rune of each word and convert to uppercase.
+			acronym.WriteString(strings.ToUpper(string([]rune(word)[0])))
+		}
+	}
+
+	if acronym.Len() == 0 {
+		return "UNKNOWN"
+	}
+
+	return fmt.Sprintf("Project: %s", acronym.String())
+}
+
 // RegisterRoutes registers the controller's endpoints to the provided ServeMux.
 func (controller *ContributedRepositoriesController) RegisterRoutes(router *http.ServeMux) {
 	// Explicitly map HTTP verbs and paths.
@@ -271,9 +328,10 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	var includeIssues bool
 	var showRecentActivityStats int
 	var adaptiveRecentActivityStats bool
+	var includePrivate bool
 	var parseError error
 
-	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, includeIssues, showRecentActivityStats, adaptiveRecentActivityStats, _, parseError = controller.parseQueryParameters(request)
+	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, includeIssues, showRecentActivityStats, adaptiveRecentActivityStats, _, includePrivate, parseError = controller.parseQueryParameters(request)
 
 	if parseError != nil {
 		http.Error(responseWriter, parseError.Error(), http.StatusBadRequest)
@@ -294,10 +352,11 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 		repositoryNameFilters,
 		repositoryTopicFilters,
 		includeCommits,
-		includePullRequests,
 		includeIssues,
+		includePullRequests,
 		showRecentActivityStats,
 		adaptiveRecentActivityStats,
+		includePrivate,
 	)
 
 	if executeError != nil {
@@ -347,9 +406,10 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	var showRecentActivityStats int
 	var adaptiveRecentActivityStats bool
 	var showLatestActivity bool
+	var includePrivate bool
 	var parseError error
 
-	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, includeIssues, showRecentActivityStats, adaptiveRecentActivityStats, showLatestActivity, parseError = controller.parseQueryParameters(request)
+	username, limitCount, startTime, endTime, repositoryNameFilters, repositoryTopicFilters, includeCommits, includePullRequests, includeIssues, showRecentActivityStats, adaptiveRecentActivityStats, showLatestActivity, includePrivate, parseError = controller.parseQueryParameters(request)
 
 	if parseError != nil {
 		http.Error(responseWriter, parseError.Error(), http.StatusBadRequest)
@@ -376,10 +436,11 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 		repositoryNameFilters,
 		repositoryTopicFilters,
 		includeCommits,
-		includePullRequests,
 		includeIssues,
+		includePullRequests,
 		showRecentActivityStats,
 		adaptiveRecentActivityStats,
+		includePrivate,
 	)
 
 	if executeError != nil {
@@ -409,25 +470,55 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 	var result *domain.ContributedRepository
 
 	for _, result = range results {
-		var ownedTag string = ""
-		if result.IsOwner {
-			ownedTag = " `Owned`"
-		}
-
-		// - **[RepoName](RepoURL)** `Owned` — Description.
-		// If description is empty, don't print the dash.
+		var isPrivate bool = result.Repository.Private
+		var displayName string = result.Repository.Name
+		var displayURL string = result.Repository.HTMLURL
 		var descriptionPart string = ""
+		var tags []string = make([]string, 0)
 
 		if result.Repository.Description != "" {
 			descriptionPart = fmt.Sprintf(" — %s", result.Repository.Description)
 		}
 
-		fmt.Fprintf(responseWriter, "- **[%s](%s)**%s%s\n\n",
-			result.Repository.Name,
-			result.Repository.HTMLURL,
-			ownedTag,
-			descriptionPart,
-		)
+		if isPrivate {
+			displayName = controller.anonymizeRepositoryName(result.Repository.Name)
+			tags = append(tags, "`Private`")
+
+			// For private repositories: NO link, just bold text.
+			if result.IsOwner {
+				tags = append(tags, "`Owned`")
+			}
+
+			var tagsStr string
+
+			if len(tags) > 0 {
+				tagsStr = " " + strings.Join(tags, " ")
+			}
+
+			fmt.Fprintf(responseWriter, "- **%s**%s%s\n\n",
+				displayName,
+				tagsStr,
+				descriptionPart,
+			)
+		} else {
+			// Public repositories: Link enabled.
+			if result.IsOwner {
+				tags = append(tags, "`Owned`")
+			}
+
+			var tagsStr string
+
+			if len(tags) > 0 {
+				tagsStr = " " + strings.Join(tags, " ")
+			}
+
+			fmt.Fprintf(responseWriter, "- **[%s](%s)**%s%s\n\n",
+				displayName,
+				displayURL,
+				tagsStr,
+				descriptionPart,
+			)
+		}
 
 		// Render Activity Stats if present.
 		if result.ActivityStats != nil {
@@ -443,6 +534,7 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 			if result.ActivityStats.PullRequestCount > 0 && includePullRequests {
 				stats = append(stats, fmt.Sprintf("%d Pull Requests", result.ActivityStats.PullRequestCount))
 			}
+
 			if result.ActivityStats.IssueCount > 0 && includeIssues {
 				stats = append(stats, fmt.Sprintf("%d Issues", result.ActivityStats.IssueCount))
 			}
@@ -471,7 +563,8 @@ func (controller *ContributedRepositoriesController) HandleGetContributedReposit
 		}
 
 		// Render Latest Activity if requested and present.
-		if showLatestActivity && result.LatestActivity != nil {
+		// Requirement: "Latest activity details will NOT be shown for private repositories even if show_latest_activity is true."
+		if showLatestActivity && result.LatestActivity != nil && !isPrivate {
 			var emoji string
 			var activityTitle string = result.LatestActivity.Title
 			var activityURL string = result.LatestActivity.URL

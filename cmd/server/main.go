@@ -18,7 +18,9 @@ func main() {
 	// 1. Configuration.
 	var address string = "0.0.0.0:8080"
 
-	if envPort := os.Getenv("APP_LISTEN_PORT"); envPort != "" {
+	var envPort string = os.Getenv("APP_LISTEN_PORT")
+
+	if envPort != "" {
 		address = "0.0.0.0:" + envPort
 	}
 
@@ -43,12 +45,20 @@ func main() {
 		repoFetcher,
 	)
 
+	var trendTopicsUseCase *usecase.TrendTopicsUseCase = usecase.NewTrendTopicsUseCase(
+		commitFetcher,
+		issueFetcher,
+		prFetcher,
+		repoFetcher,
+	)
+
 	// 4. Instantiate Application Engine.
 	var applicationEngine *internalHttp.Application = internalHttp.NewApplication(address)
 
 	// 5. Instantiate Controllers.
 	var supportController *handler.SupportController = handler.NewSupportController()
 	var repositoryController *handler.ContributedRepositoriesController = handler.NewContributedRepositoriesController(contributedReposUseCase)
+	var trendTopicsController *handler.TrendTopicsController = handler.NewTrendTopicsController(trendTopicsUseCase)
 
 	// 6. Get Router.
 	var router *stdlibHttp.ServeMux = applicationEngine.GetRouter()
@@ -56,6 +66,7 @@ func main() {
 	// 7. Register Routes.
 	supportController.RegisterRoutes(router)
 	repositoryController.RegisterRoutes(router)
+	trendTopicsController.RegisterRoutes(router)
 
 	// 8. Run Server.
 	fmt.Printf("Server starting on %s...\n", address)
