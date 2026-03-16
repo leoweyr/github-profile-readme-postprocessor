@@ -77,11 +77,11 @@ func (fetcher *RepositoryFetcher) FetchRepository(context context.Context, owner
 	return domainRepository, nil
 }
 
-// FetchPrivateRepositories retrieves a list of private repositories for the authenticated user.
-func (fetcher *RepositoryFetcher) FetchPrivateRepositories(context context.Context) ([]*domain.Repository, error) {
-	var allPrivateRepos []*domain.Repository
+// FetchUserRepositories retrieves a list of all repositories (public and private) for the authenticated user.
+func (fetcher *RepositoryFetcher) FetchUserRepositories(context context.Context) ([]*domain.Repository, error) {
+	var allUserRepos []*domain.Repository
 	var listOptions *github.RepositoryListOptions = &github.RepositoryListOptions{
-		Visibility:  "private",
+		Visibility:  "all",
 		Affiliation: "owner,collaborator,organization_member", // Include repos where user is owner, collaborator, or org member.
 		Sort:        "pushed",
 		Direction:   "desc",
@@ -95,7 +95,7 @@ func (fetcher *RepositoryFetcher) FetchPrivateRepositories(context context.Conte
 		repositories, response, listError = fetcher.client.Repositories.List(context, "", listOptions)
 
 		if listError != nil {
-			return nil, fmt.Errorf("failed to list private repositories: %w", listError)
+			return nil, fmt.Errorf("failed to list user repositories: %w", listError)
 		}
 
 		var repository *github.Repository
@@ -117,6 +117,12 @@ func (fetcher *RepositoryFetcher) FetchPrivateRepositories(context context.Conte
 				ownerName = repository.GetOwner().GetLogin()
 			}
 
+			var isPrivate bool
+
+			if repository.Private != nil {
+				isPrivate = *repository.Private
+			}
+
 			var domainRepository *domain.Repository = &domain.Repository{
 				Name:        repository.GetName(),
 				FullName:    repository.GetFullName(),
@@ -124,11 +130,11 @@ func (fetcher *RepositoryFetcher) FetchPrivateRepositories(context context.Conte
 				HTMLURL:     repository.GetHTMLURL(),
 				Owner:       ownerName,
 				Topics:      repository.Topics,
-				Private:     true,
+				Private:     isPrivate,
 				PushedAt:    pushedAt,
 			}
 
-			allPrivateRepos = append(allPrivateRepos, domainRepository)
+			allUserRepos = append(allUserRepos, domainRepository)
 		}
 
 		if response.NextPage == 0 {
@@ -138,5 +144,5 @@ func (fetcher *RepositoryFetcher) FetchPrivateRepositories(context context.Conte
 		listOptions.Page = response.NextPage
 	}
 
-	return allPrivateRepos, nil
+	return allUserRepos, nil
 }
