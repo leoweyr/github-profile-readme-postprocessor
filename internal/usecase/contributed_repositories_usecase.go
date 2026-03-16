@@ -78,37 +78,39 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		allCommits, commitError = useCase.commitFetcher.FetchCommits(context, username, startTime, endTime)
 
 		if commitError != nil {
-			return nil, commitError
-		}
+			fmt.Printf("Warning: Failed to fetch commits: %v\n", commitError)
 
-		var commit *domain.Commit
+			// Continue execution to avoid 500 error, just missing commit data.
+		} else {
+			var commit *domain.Commit
 
-		for _, commit = range allCommits {
-			if commit == nil {
-				continue
-			}
-
-			if commit.RepositoryName == "" {
-				continue
-			}
-
-			var currentLatest time.Time = repositoryActivityMap[commit.RepositoryName]
-
-			if commit.CommittedAt.After(currentLatest) {
-				repositoryActivityMap[commit.RepositoryName] = commit.CommittedAt
-				var title string = commit.Message
-
-				var index int = strings.Index(title, "\n")
-
-				if index != -1 {
-					title = title[:index]
+			for _, commit = range allCommits {
+				if commit == nil {
+					continue
 				}
 
-				repositoryLatestActivityMap[commit.RepositoryName] = &domain.ActivityItem{
-					Type:      domain.ActivityTypeCommit,
-					Title:     title,
-					URL:       commit.HTMLURL,
-					CreatedAt: commit.CommittedAt,
+				if commit.RepositoryName == "" {
+					continue
+				}
+
+				var currentLatest time.Time = repositoryActivityMap[commit.RepositoryName]
+
+				if commit.CommittedAt.After(currentLatest) {
+					repositoryActivityMap[commit.RepositoryName] = commit.CommittedAt
+					var title string = commit.Message
+
+					var index int = strings.Index(title, "\n")
+
+					if index != -1 {
+						title = title[:index]
+					}
+
+					repositoryLatestActivityMap[commit.RepositoryName] = &domain.ActivityItem{
+						Type:      domain.ActivityTypeCommit,
+						Title:     title,
+						URL:       commit.HTMLURL,
+						CreatedAt: commit.CommittedAt,
+					}
 				}
 			}
 		}
@@ -119,34 +121,35 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		allPullRequests, pullRequestError = useCase.pullRequestFetcher.FetchPullRequests(context, username, startTime, endTime)
 
 		if pullRequestError != nil {
-			return nil, pullRequestError
-		}
-		var pullRequest *domain.PullRequest
+			fmt.Printf("Warning: Failed to fetch PRs: %v\n", pullRequestError)
+		} else {
+			var pullRequest *domain.PullRequest
 
-		for _, pullRequest = range allPullRequests {
-			if pullRequest == nil {
-				continue
-			}
+			for _, pullRequest = range allPullRequests {
+				if pullRequest == nil {
+					continue
+				}
 
-			var repoName string = pullRequest.RepositoryName
+				var repoName string = pullRequest.RepositoryName
 
-			if strings.HasPrefix(repoName, "https://api.github.com/repos/") {
-				repoName = strings.TrimPrefix(repoName, "https://api.github.com/repos/")
-			}
+				if strings.HasPrefix(repoName, "https://api.github.com/repos/") {
+					repoName = strings.TrimPrefix(repoName, "https://api.github.com/repos/")
+				}
 
-			if repoName == "" {
-				continue
-			}
+				if repoName == "" {
+					continue
+				}
 
-			var currentLatest time.Time = repositoryActivityMap[repoName]
+				var currentLatest time.Time = repositoryActivityMap[repoName]
 
-			if pullRequest.CreatedAt.After(currentLatest) {
-				repositoryActivityMap[repoName] = pullRequest.CreatedAt
-				repositoryLatestActivityMap[repoName] = &domain.ActivityItem{
-					Type:      domain.ActivityTypePullRequest,
-					Title:     pullRequest.Title,
-					URL:       pullRequest.HTMLURL,
-					CreatedAt: pullRequest.CreatedAt,
+				if pullRequest.CreatedAt.After(currentLatest) {
+					repositoryActivityMap[repoName] = pullRequest.CreatedAt
+					repositoryLatestActivityMap[repoName] = &domain.ActivityItem{
+						Type:      domain.ActivityTypePullRequest,
+						Title:     pullRequest.Title,
+						URL:       pullRequest.HTMLURL,
+						CreatedAt: pullRequest.CreatedAt,
+					}
 				}
 			}
 		}
@@ -157,35 +160,36 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		allIssues, issueError = useCase.issueFetcher.FetchIssueActivities(context, username, startTime, endTime)
 
 		if issueError != nil {
-			return nil, issueError
-		}
-		var issue *domain.Issue
+			fmt.Printf("Warning: Failed to fetch issues: %v\n", issueError)
+		} else {
+			var issue *domain.Issue
 
-		for _, issue = range allIssues {
-			if issue == nil {
-				continue
-			}
+			for _, issue = range allIssues {
+				if issue == nil {
+					continue
+				}
 
-			var repoName string = issue.RepositoryName
+				var repoName string = issue.RepositoryName
 
-			if strings.HasPrefix(repoName, "https://api.github.com/repos/") {
-				repoName = strings.TrimPrefix(repoName, "https://api.github.com/repos/")
-			}
+				if strings.HasPrefix(repoName, "https://api.github.com/repos/") {
+					repoName = strings.TrimPrefix(repoName, "https://api.github.com/repos/")
+				}
 
-			if repoName == "" {
-				continue
-			}
+				if repoName == "" {
+					continue
+				}
 
-			var currentLatest time.Time = repositoryActivityMap[repoName]
+				var currentLatest time.Time = repositoryActivityMap[repoName]
 
-			if issue.CreatedAt.After(currentLatest) {
-				repositoryActivityMap[repoName] = issue.CreatedAt
-				repositoryLatestActivityMap[repoName] = &domain.ActivityItem{
-					Type:        domain.ActivityTypeIssue,
-					Title:       issue.Title,
-					URL:         issue.HTMLURL,
-					CreatedAt:   issue.CreatedAt,
-					IssueAction: issue.Action,
+				if issue.CreatedAt.After(currentLatest) {
+					repositoryActivityMap[repoName] = issue.CreatedAt
+					repositoryLatestActivityMap[repoName] = &domain.ActivityItem{
+						Type:        domain.ActivityTypeIssue,
+						Title:       issue.Title,
+						URL:         issue.HTMLURL,
+						CreatedAt:   issue.CreatedAt,
+						IssueAction: issue.Action,
+					}
 				}
 			}
 		}
@@ -337,6 +341,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		// Check if it's a private repo that needs hydration.
 		var privateRepo *domain.Repository = repositoryIsPrivateMap[repoName]
 		var isPrivateCandidate bool = privateRepo != nil
+		var latestActivityFound bool = false
 
 		// 3.1 Hydrate Latest Activity (for Private only).
 		// Public repos already have `repositoryLatestActivityMap` populated from Phase 1.
@@ -377,7 +382,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 			var bestTime time.Time
 			var bestItem *domain.ActivityItem
 
-			if latestCommit != nil && latestCommit.CommittedAt.After(bestTime) {
+			if latestCommit != nil && (bestTime.IsZero() || latestCommit.CommittedAt.After(bestTime)) {
 				bestTime = latestCommit.CommittedAt
 				var title string = latestCommit.Message
 				var idx int = strings.Index(title, "\n")
@@ -388,12 +393,12 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				bestItem = &domain.ActivityItem{Type: domain.ActivityTypeCommit, Title: title, URL: latestCommit.HTMLURL, CreatedAt: bestTime}
 			}
 
-			if latestPR != nil && latestPR.CreatedAt.After(bestTime) {
+			if latestPR != nil && (bestTime.IsZero() || latestPR.CreatedAt.After(bestTime)) {
 				bestTime = latestPR.CreatedAt
 				bestItem = &domain.ActivityItem{Type: domain.ActivityTypePullRequest, Title: latestPR.Title, URL: latestPR.HTMLURL, CreatedAt: bestTime}
 			}
 
-			if latestIssue != nil && latestIssue.CreatedAt.After(bestTime) {
+			if latestIssue != nil && (bestTime.IsZero() || latestIssue.CreatedAt.After(bestTime)) {
 				bestTime = latestIssue.CreatedAt
 				bestItem = &domain.ActivityItem{Type: domain.ActivityTypeIssue, Title: latestIssue.Title, URL: latestIssue.HTMLURL, CreatedAt: bestTime, IssueAction: latestIssue.Action}
 			}
@@ -402,16 +407,22 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				repositoryLatestActivityMap[repoName] = bestItem
 				// Update ActiveAt to precise time.
 				candidate.ActiveAt = bestTime
+				latestActivityFound = true
 			}
+		} else {
+			// Public repo: check if we found activity in Phase 1.
+			if _, ok := repositoryLatestActivityMap[repoName]; ok {
+				latestActivityFound = true
+			}
+		}
 
-			// Critical: If no latest activity exists for the user after checking all types,
-			// it means the repository was picked up by PushedAt (Phase 1.2) but the user hasn't actually contributed,
-			// or the user contributed outside the scope/time.
-			// Filter out these false positives.
-			if repositoryLatestActivityMap[repoName] == nil {
-				// No activity found for this user in this private repo. Skip it.
-				continue
-			}
+		// Critical: If no latest activity exists for the user after checking all types,
+		// it means the repository was picked up by PushedAt (Phase 1.2) but the user hasn't actually contributed,
+		// or the user contributed outside the scope/time.
+		// Filter out these false positives.
+		if isPrivateCandidate && !latestActivityFound {
+			// No activity found for this user in this private repo. Skip it.
+			continue
 		}
 
 		// 3.2 Hydrate Stats (Ladder Strategy).
