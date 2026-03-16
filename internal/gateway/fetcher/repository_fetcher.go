@@ -43,6 +43,10 @@ func (fetcher *RepositoryFetcher) FetchRepository(context context.Context, owner
 		return nil, fmt.Errorf("failed to fetch repository %s/%s: %w", owner, repositoryName, fetchError)
 	}
 
+	if repository == nil {
+		return nil, fmt.Errorf("repository %s/%s not found (nil response)", owner, repositoryName)
+	}
+
 	var description string
 
 	if repository.Description != nil {

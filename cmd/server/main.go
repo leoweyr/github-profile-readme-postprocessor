@@ -66,9 +66,7 @@ func main() {
 	// 7. Register Routes.
 	supportController.RegisterRoutes(router)
 	repositoryController.RegisterRoutes(router)
-
-	// Register Trend Topics Routes explicitly.
-	router.HandleFunc("GET /api/github-profile-readme-postprocessor/v1/trend-topics/markdown", trendTopicsController.GetTrendTopicsMarkdown)
+	trendTopicsController.RegisterRoutes(router)
 
 	// 8. Run Server.
 	fmt.Printf("Server starting on %s...\n", address)

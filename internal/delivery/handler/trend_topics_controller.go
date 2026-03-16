@@ -21,6 +21,11 @@ func NewTrendTopicsController(trendTopicsUseCase *usecase.TrendTopicsUseCase) *T
 	}
 }
 
+// RegisterRoutes registers the controller's endpoints to the provided ServeMux.
+func (controller *TrendTopicsController) RegisterRoutes(router *http.ServeMux) {
+	router.HandleFunc("GET /v1/trend-topics/markdown", controller.GetTrendTopicsMarkdown)
+}
+
 // GetTrendTopicsMarkdown handles the request to get trend topics in markdown format.
 func (controller *TrendTopicsController) GetTrendTopicsMarkdown(responseWriter http.ResponseWriter, request *http.Request) {
 	var queryValues url.Values = request.URL.Query()

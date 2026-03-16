@@ -82,6 +82,10 @@ func (useCase *TrendTopicsUseCase) Execute(
 	var c *domain.Commit
 
 	for _, c = range allCommits {
+		if c == nil {
+			continue
+		}
+
 		if c.RepositoryName != "" {
 			activeRepoNames[c.RepositoryName] = true
 		}
@@ -98,6 +102,10 @@ func (useCase *TrendTopicsUseCase) Execute(
 	var p *domain.PullRequest
 
 	for _, p = range allPullRequests {
+		if p == nil {
+			continue
+		}
+
 		var repoName string = cleanRepoName(p.RepositoryName)
 
 		if repoName != "" {
@@ -115,6 +123,10 @@ func (useCase *TrendTopicsUseCase) Execute(
 	var i *domain.Issue
 
 	for _, i = range allIssues {
+		if i == nil {
+			continue
+		}
+
 		var repoName string = cleanRepoName(i.RepositoryName)
 
 		if repoName != "" {
@@ -199,6 +211,10 @@ func (useCase *TrendTopicsUseCase) Execute(
 
 	// Process Commits (Weight: 1).
 	for _, c = range allCommits {
+		if c == nil {
+			continue
+		}
+
 		if c.RepositoryName == "" {
 			continue
 		}
@@ -209,6 +225,10 @@ func (useCase *TrendTopicsUseCase) Execute(
 
 	// Process PRs (Weight: 1).
 	for _, p = range allPullRequests {
+		if p == nil {
+			continue
+		}
+
 		var repoName string = cleanRepoName(p.RepositoryName)
 
 		if repoName == "" {
@@ -221,6 +241,10 @@ func (useCase *TrendTopicsUseCase) Execute(
 
 	// Process Issues (Weight: 1).
 	for _, i = range allIssues {
+		if i == nil {
+			continue
+		}
+
 		var repoName string = cleanRepoName(i.RepositoryName)
 
 		if repoName == "" {

@@ -84,6 +84,10 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		var commit *domain.Commit
 
 		for _, commit = range allCommits {
+			if commit == nil {
+				continue
+			}
+
 			if commit.RepositoryName == "" {
 				continue
 			}
@@ -120,6 +124,10 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		var pullRequest *domain.PullRequest
 
 		for _, pullRequest = range allPullRequests {
+			if pullRequest == nil {
+				continue
+			}
+
 			var repoName string = pullRequest.RepositoryName
 
 			if strings.HasPrefix(repoName, "https://api.github.com/repos/") {
@@ -154,6 +162,10 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		var issue *domain.Issue
 
 		for _, issue = range allIssues {
+			if issue == nil {
+				continue
+			}
+
 			var repoName string = issue.RepositoryName
 
 			if strings.HasPrefix(repoName, "https://api.github.com/repos/") {
@@ -191,6 +203,10 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 			var repo *domain.Repository
 
 			for _, repo = range privateRepos {
+				if repo == nil {
+					continue
+				}
+
 				// Use PushedAt as a lightweight proxy for "Latest Activity".
 				// This avoids fetching commits/issues for every private repo.
 				if !repo.PushedAt.IsZero() && !repo.PushedAt.Before(startTime) {
@@ -422,6 +438,10 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 					var c *domain.Commit
 
 					for _, c = range allCommits {
+						if c == nil {
+							continue
+						}
+
 						if c.RepositoryName == repoName && c.CommittedAt.After(currentCutoff) {
 							currentStats.CommitCount++
 						}
@@ -432,6 +452,10 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 					var p *domain.PullRequest
 
 					for _, p = range allPullRequests {
+						if p == nil {
+							continue
+						}
+
 						var pRepo string = p.RepositoryName
 
 						if strings.HasPrefix(pRepo, "https://api.github.com/repos/") {
@@ -448,6 +472,10 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 					var i *domain.Issue
 
 					for _, i = range allIssues {
+						if i == nil {
+							continue
+						}
+
 						var iRepo string = i.RepositoryName
 
 						if strings.HasPrefix(iRepo, "https://api.github.com/repos/") {
