@@ -251,14 +251,33 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 
 	// Slice Top N logic resides inside the loop to support filtering.
 	// Iterate through all candidates until finding enough matching repositories.
+	// NOTE: Do NOT break early based on strict limitCount here because the initial sort order
+	// (based on PushedAt) is imprecise. A repository lower in the list might jump up
+	// after hydration.
+	//
+	// Strategy:
+	// 1. Fetch details and hydrate stats for a "buffer" of candidates (e.g., limitCount + 5).
+	// 2. This ensures a pool of hydrated repositories that is slightly larger than needed.
+	// 3. Then, AFTER the loop, re-sort this pool by the precise ActiveAt time.
+	// 4. Finally, slice the pool to the exact limitCount.
 	var contributedRepositories []*domain.ContributedRepository
 	var repositoryStatsMap map[string]*domain.ActivityStats = make(map[string]*domain.ActivityStats)
 
 	var candidate Candidate
+	var processedCount int = 0
 
 	for _, candidate = range candidates {
-		// Stop if we have reached the requested limit.
-		if limitCount > 0 && len(contributedRepositories) >= limitCount {
+		// Optimization: If (limitCount + buffer) VALID repositories are found, stop.
+		// The buffer (5) allows for some re-ordering flexibility.
+		// e.g. if limit=3, fetch 8. Even if #8 jumps to #1, it is captured.
+		if limitCount > 0 && len(contributedRepositories) >= limitCount+5 {
+			break
+		}
+
+		// Hard cap to prevent excessive API usage in worst case (e.g. if limit is huge or filter is loose).
+		processedCount++
+
+		if processedCount > 50 {
 			break
 		}
 
@@ -413,7 +432,7 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 				latestActivityFound = true
 			}
 		} else {
-			// Public repo: check if we found activity in Phase 1.
+			// Public repo: check if activity was found in Phase 1.
 			if _, ok := repositoryLatestActivityMap[repoName]; ok {
 				latestActivityFound = true
 			}
@@ -569,6 +588,16 @@ func (useCase *ContributedRepositoriesUseCase) Execute(
 		}
 
 		contributedRepositories = append(contributedRepositories, contributedRepository)
+	}
+
+	// Re-sort the final list by ActiveAt descending.
+	sort.Slice(contributedRepositories, func(i, j int) bool {
+		return contributedRepositories[i].ActiveAt.After(contributedRepositories[j].ActiveAt)
+	})
+
+	// Slice to the requested limit.
+	if limitCount > 0 && len(contributedRepositories) > limitCount {
+		contributedRepositories = contributedRepositories[:limitCount]
 	}
 
 	return contributedRepositories, nil

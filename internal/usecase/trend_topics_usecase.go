@@ -135,7 +135,7 @@ func (useCase *TrendTopicsUseCase) Execute(
 	}
 
 	// 1.2 User Repository Discovery.
-	// Fetch all repositories (including public) to ensure we have a complete list
+	// Fetch all repositories (including public) to ensure a complete list
 	// of candidates for trend analysis, bypassing potential Search API delays.
 	var repoCache map[string]*domain.Repository = make(map[string]*domain.Repository)
 
