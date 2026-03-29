@@ -38,6 +38,11 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: Track Workflow Run
+      continue-on-error: true
+      run: |
+        curl -s "https://abacus.jasoncameron.dev/hit/leoweyr/github-profile-readme-postprocessor-usage" > /dev/null    
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
