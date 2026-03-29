@@ -1,7 +1,5 @@
 ![github-profile-readme-postprocessor](https://socialify.git.ci/leoweyr/github-profile-readme-postprocessor/image?description=1&font=KoHo&logo=https%3A%2F%2Fraw.githubusercontent.com%2Fleoweyr%2Fgithub-profile-readme-postprocessor%2Frefs%2Fheads%2Fdevelop%2Fassets%2Ficon.svg&name=1&owner=1&pattern=Formal+Invitation&theme=Light)
 
-![Usage](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fabacus.jasoncameron.dev%2Fget%2Fleoweyr%2Fgithub-profile-readme-postprocessor-usage&query=%24.value&label=Usage&color=blue&suffix=%20times)
-
 ## 🏗️ Build
 
 You can build the Docker image with optional build arguments to configure the Alpine mirror and Go proxy.
@@ -18,6 +16,9 @@ docker build -t github-profile-postprocessor --build-arg ALPINE_MIRROR=$AlpineMi
 | `GOPROXY`       | Go module proxy URL.                             |
 
 ## 🐙 GitHub Actions Usage
+
+![Usage](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fabacus.jasoncameron.dev%2Fget%2Fleoweyr%2Fgithub-profile-readme-postprocessor-usage&query=%24.value&label=Usage&color=blue&suffix=%20times)
+![Used by Developers](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/leoweyr/64244ccf3d52ec6458cb56c652a41c8d/raw/github-profile-readme-postprocessor-github-actions-used-by-stats.json)
 
 You can use this tool as a GitHub Action to automatically update your profile README.
 
