@@ -40,6 +40,7 @@ runs:
   steps:
     - name: Track Workflow Run
       continue-on-error: true
+      shell: bash
       run: |
         curl -s "https://abacus.jasoncameron.dev/hit/leoweyr/github-profile-readme-postprocessor-usage" > /dev/null    
 
