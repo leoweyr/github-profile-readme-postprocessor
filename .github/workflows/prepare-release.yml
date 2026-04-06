@@ -10,64 +10,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  prepare-release:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Set Environment Variables
-        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-
-      - name: Create Release Branch
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b release/${{ env.TAG_NAME }}
-
-      - name: Generate Changelog Content for PR Body
-        id: git_cliff_pr
-        env:
-          GITHUB_REPO: ${{ github.repository }}
-        run: |
-          npx git-cliff --config cliff.toml --verbose --latest --strip all > pr_body_raw.md
-
-      - name: Save PR Body to File
-        run: |
-          cat pr_body_raw.md | tail -n +2 > pr_body_cleaned.md
-
-      - name: Update CHANGELOG.md File
-        run: |
-          if [ -f "CHANGELOG.md" ]; then
-             # File exists: Prepend new changes (git-cliff intelligently handles headers).
-             npx git-cliff --config cliff.toml --verbose --latest --prepend CHANGELOG.md
-          else
-             # File missing: Create new with full history and header.
-             npx git-cliff --config cliff.toml --verbose --output CHANGELOG.md
-          fi
-        env:
-          GITHUB_REPO: ${{ github.repository }}
-
-      - name: Commit and Push
-        run: |
-          git add CHANGELOG.md
-          git commit -m "release: ${{ env.TAG_NAME }}"
-          git push origin release/${{ env.TAG_NAME }}
-
-      - name: Create Pull Request
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr create \
-            --title "release: ${{ env.TAG_NAME }}" \
-            --body-file pr_body_cleaned.md \
-            --base master \
-            --head release/${{ env.TAG_NAME }}
+  call-prepare:
+    uses: leoweyr/github-release-workflow/.github/workflows/reusable-prepare-release.yml@develop
+    secrets:
+      ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}

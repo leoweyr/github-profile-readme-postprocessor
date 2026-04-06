@@ -8,35 +8,10 @@ permissions:
   contents: write
 
 jobs:
-  publish-release:
-    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.title, 'release:')
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Extract Tag Name
-        id: extract_tag
-        run: |
-          TITLE="${{ github.event.pull_request.title }}"
-          TAG_NAME=$(echo "$TITLE" | sed 's/release: //')
-          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
-          VERSION_TITLE=${TAG_NAME#v}
-          echo "VERSION_TITLE=$VERSION_TITLE" >> $GITHUB_ENV
-
-      - name: Create Release Body File
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: echo "$PR_BODY" > release_body.md
-
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create ${{ env.TAG_NAME }} \
-            --title "${{ env.VERSION_TITLE }}" \
-            --notes-file release_body.md \
-            --verify-tag
+  call-publish:
+    uses: leoweyr/github-release-workflow/.github/workflows/reusable-publish-release.yml@develop
+    with:
+      trb-repository: 'ODCLAB/odyssey-plan'
+      trb-project-node-name: 'GitHub Profile Readme Postprocessor'
+    secrets:
+      ACCESS_TOKEN: ${{ secrets.PUBLISH_GITHUB_TOKEN }}
