@@ -69,7 +69,6 @@ func main() {
 	trendTopicsController.RegisterRoutes(router)
 
 	// 8. Run Server.
-	fmt.Printf("Server starting on %s...\n", address)
 	var executionError error = applicationEngine.Run()
 
 	if executionError != nil {
