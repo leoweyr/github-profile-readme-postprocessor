@@ -7,7 +7,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"go.leoweyr.com/github-profile-postprocessor/internal/delivery/handler"
-	internalHttp "go.leoweyr.com/github-profile-postprocessor/internal/delivery/http"
+	"go.leoweyr.com/github-profile-postprocessor/internal/delivery/httpserver"
 	"go.leoweyr.com/github-profile-postprocessor/internal/gateway/fetcher"
 	"go.leoweyr.com/github-profile-postprocessor/internal/usecase"
 )
@@ -53,7 +53,7 @@ func main() {
 	)
 
 	// 4. Instantiate Application Engine.
-	var applicationEngine *internalHttp.Application = internalHttp.NewApplication(address)
+	var applicationEngine *httpserver.Application = httpserver.NewApplication()
 
 	// 5. Instantiate Controllers.
 	var supportController *handler.SupportController = handler.NewSupportController()
@@ -69,7 +69,7 @@ func main() {
 	trendTopicsController.RegisterRoutes(router)
 
 	// 8. Run Server.
-	var executionError error = applicationEngine.Run()
+	var executionError error = applicationEngine.Run(address)
 
 	if executionError != nil {
 		fmt.Printf("FATAL: Server execution failed: %v\n", executionError)
