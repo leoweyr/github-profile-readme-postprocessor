@@ -61,7 +61,7 @@ func (application *Application) Run(address string) error {
 		// The routing middleware with panic recovery is mounted here.
 		Handler:      recoverPanic(application.multiplexer),
 		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		WriteTimeout: 60 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
 
